@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<body>
+<div th:fragment="sidebar">
+    <nav class="sidebar">
+        <a class="brand" th:href="@{/dashboard}">
+            <i class="bi bi-hdd-rack"></i>
+            <span>SVP Console</span>
+        </a>
+
+        <div class="nav-section-label">Overview</div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" th:classappend="${activePage == 'dashboard' ? 'active' : ''}"
+                   th:href="@{/dashboard}">
+                    <i class="bi bi-speedometer2"></i> Dashboard
+                </a>
+            </li>
+        </ul>
+
+        <div class="nav-section-label">Management</div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" th:classappend="${activePage == 'stubs' ? 'active' : ''}"
+                   th:href="@{/ui/stubs}">
+                    <i class="bi bi-file-earmark-code"></i> Stubs
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" th:classappend="${activePage == 'sessions' ? 'active' : ''}"
+                   th:href="@{/ui/sessions}">
+                    <i class="bi bi-person-badge"></i> Sessions
+                </a>
+            </li>
+        </ul>
+
+        <div class="nav-section-label">Observability</div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" th:classappend="${activePage == 'traffic' ? 'active' : ''}"
+                   th:href="@{/ui/traffic}">
+                    <i class="bi bi-activity"></i> Traffic
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" th:classappend="${activePage == 'drift' ? 'active' : ''}"
+                   th:href="@{/ui/drift}">
+                    <i class="bi bi-sliders"></i> Drift
+                </a>
+            </li>
+        </ul>
+
+        <div class="nav-section-label">Ingestion</div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" th:classappend="${activePage == 'recording' ? 'active' : ''}"
+                   th:href="@{/ui/recording}">
+                    <i class="bi bi-record-circle"></i> Recording
+                </a>
+            </li>
+        </ul>
+
+        <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 1rem; border-top: 1px solid var(--svp-border);">
+            <div style="font-size: 0.6875rem; color: var(--svp-muted);">
+                Service Virtualization Platform
+                <br/>
+                <a th:href="@{/swagger-ui.html}" style="color: var(--svp-accent); text-decoration: none;">
+                    <i class="bi bi-box-arrow-up-right"></i> API Docs
+                </a>
+            </div>
+        </div>
+    </nav>
+</div>
+</body>
+</html>

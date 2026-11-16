@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/head :: common}">
+    <title>Recording | SVP</title>
+</head>
+<body>
+
+<div th:replace="~{fragments/navbar :: sidebar}"></div>
+
+<div class="main-content">
+    <div class="page-header">
+        <h1>Recording &amp; Ingestion</h1>
+        <p>Ingest raw traffic to auto-generate stubs with PCI/PII sanitization</p>
+    </div>
+
+    <div class="row g-3">
+        <!-- Ingest Form -->
+        <div class="col-md-7">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-cloud-upload me-2"></i>Ingest Raw Traffic
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Raw Traffic JSON</label>
+                        <textarea class="form-control" id="rawTrafficJson" rows="14"
+                                  style="font-family: monospace; font-size: 0.8125rem; background-color: var(--svp-bg); border-color: var(--svp-border); color: var(--svp-text);"
+                                  placeholder='Paste raw HTTP request/response JSON here...'></textarea>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="ingestTraffic()">
+                            <i class="bi bi-upload me-1"></i>Ingest &amp; Generate Stub
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="loadSampleJson()">
+                            <i class="bi bi-code-square me-1"></i>Load Sample
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Result Display -->
+            <div class="card mt-3" id="ingestResultCard" style="display: none;">
+                <div class="card-header">
+                    <i class="bi bi-check2-circle me-2"></i>Ingestion Result
+                </div>
+                <div class="card-body" id="ingestResult"></div>
+            </div>
+        </div>
+
+        <!-- Recording History -->
+        <div class="col-md-5">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-clock-history me-2"></i>Recording History</span>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="refreshHistory()">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div id="historyContainer">
+                        <table class="table table-hover mb-0" th:if="${not #lists.isEmpty(history)}">
+                            <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Timestamp</th>
+                                <th>Path</th>
+                                <th>Status</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="record : ${history}">
+                                <td>
+                                    <code class="text-accent" th:text="${record.id()}">rec-001</code>
+                                </td>
+                                <td class="text-svp-muted" style="font-size: 0.75rem;"
+                                    th:text="${record.timestampFormatted()}">--</td>
+                                <td>
+                                    <code th:text="${record.path()}">/api/test</code>
+                                </td>
+                                <td>
+                                    <span class="badge"
+                                          th:classappend="${record.status() == 'AUTO_PUBLISHED' ? 'bg-success' :
+                                              (record.status() == 'PENDING_REVIEW' ? 'bg-warning text-dark' :
+                                              (record.status() == 'REJECTED' ? 'bg-danger' :
+                                              (record.status() == 'ERROR' ? 'bg-danger' : 'bg-secondary')))}"
+                                          th:text="${record.status()}">PROCESSING</span>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        <div th:if="${#lists.isEmpty(history)}" class="text-center py-4 text-svp-muted">
+                            <i class="bi bi-archive" style="font-size: 2rem;"></i>
+                            <p class="mt-2 mb-0" style="font-size: 0.8125rem;">No recordings yet</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Help -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <i class="bi bi-question-circle me-2"></i>How It Works
+                </div>
+                <div class="card-body" style="font-size: 0.8125rem; color: var(--svp-muted);">
+                    <ol class="mb-0 ps-3">
+                        <li class="mb-2"><strong style="color: var(--svp-text);">Paste</strong> raw HTTP request/response JSON</li>
+                        <li class="mb-2"><strong style="color: var(--svp-text);">Sanitize</strong> -- PCI/PII fields (card numbers, SSNs, tokens) are automatically masked</li>
+                        <li class="mb-2"><strong style="color: var(--svp-text);">Generate</strong> -- A stub definition is created from the sanitized traffic</li>
+                        <li class="mb-2"><strong style="color: var(--svp-text);">Confidence</strong> -- High-confidence stubs (&gt;=90%) auto-publish; lower ones go to review</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function ingestTraffic() {
+        var jsonText = document.getElementById('rawTrafficJson').value;
+        if (!jsonText.trim()) { alert('Please paste traffic JSON'); return; }
+
+        try {
+            JSON.parse(jsonText);
+        } catch (e) {
+            alert('Invalid JSON: ' + e.message);
+            return;
+        }
+
+        fetch('/api/v1/recording/ingest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: jsonText
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(result) {
+            var card = document.getElementById('ingestResultCard');
+            card.style.display = 'block';
+
+            var html = '<div class="mb-3">';
+            html += '<div class="d-flex justify-content-between mb-2">';
+            html += '<span class="text-svp-muted">Record ID</span>';
+            html += '<code class="text-accent">' + result.recordId + '</code>';
+            html += '</div>';
+            html += '<div class="d-flex justify-content-between mb-2">';
+            html += '<span class="text-svp-muted">Status</span>';
+
+            var statusClass = result.status === 'AUTO_PUBLISHED' ? 'bg-success' :
+                (result.status === 'PENDING_REVIEW' ? 'bg-warning text-dark' : 'bg-danger');
+            html += '<span class="badge ' + statusClass + '">' + result.status + '</span>';
+            html += '</div>';
+            html += '<div class="d-flex justify-content-between mb-2">';
+            html += '<span class="text-svp-muted">Confidence</span>';
+            html += '<span>' + (result.confidence * 100).toFixed(1) + '%</span>';
+            html += '</div>';
+            html += '</div>';
+
+            if (result.requestSummary) {
+                html += '<h6 style="font-size: 0.8125rem;" class="text-svp-muted">Sanitization Summary</h6>';
+                html += '<div class="row g-2 mb-3">';
+                html += '<div class="col-6"><div class="card p-2">';
+                html += '<div style="font-size: 0.75rem; font-weight: 600;">Request</div>';
+                html += '<pre style="font-size: 0.75rem; max-height: 150px;">' + JSON.stringify(result.requestSummary, null, 2) + '</pre>';
+                html += '</div></div>';
+                html += '<div class="col-6"><div class="card p-2">';
+                html += '<div style="font-size: 0.75rem; font-weight: 600;">Response</div>';
+                html += '<pre style="font-size: 0.75rem; max-height: 150px;">' + JSON.stringify(result.responseSummary, null, 2) + '</pre>';
+                html += '</div></div>';
+                html += '</div>';
+            }
+
+            if (result.generatedStub) {
+                html += '<h6 style="font-size: 0.8125rem;" class="text-svp-muted">Generated Stub</h6>';
+                html += '<pre style="font-size: 0.75rem; max-height: 200px;">' + JSON.stringify(result.generatedStub, null, 2) + '</pre>';
+            }
+
+            document.getElementById('ingestResult').innerHTML = html;
+            refreshHistory();
+        })
+        .catch(function(err) {
+            var card = document.getElementById('ingestResultCard');
+            card.style.display = 'block';
+            document.getElementById('ingestResult').innerHTML =
+                '<div class="text-svp-red"><i class="bi bi-x-circle me-1"></i>Error: ' + err.message + '</div>';
+        });
+    }
+
+    function loadSampleJson() {
+        document.getElementById('rawTrafficJson').value = JSON.stringify({
+            "request": {
+                "method": "POST",
+                "path": "/api/v1/orders",
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.sample"
+                },
+                "body": {
+                    "customerId": "cust-123",
+                    "items": [{"sku": "ITEM-001", "qty": 2}],
+                    "payment": {
+                        "cardNumber": "4111111111111111",
+                        "cvv": "123",
+                        "expiry": "12/25"
+                    }
+                }
+            },
+            "response": {
+                "statusCode": 201,
+                "headers": {"Content-Type": "application/json"},
+                "body": {
+                    "orderId": "ord-abc-123",
+                    "status": "CREATED",
+                    "total": 49.98
+                }
+            }
+        }, null, 2);
+    }
+
+    function refreshHistory() {
+        fetch('/api/v1/recording/history')
+            .then(function(r) { return r.json(); })
+            .then(function(records) {
+                var container = document.getElementById('historyContainer');
+                if (!records || records.length === 0) {
+                    container.innerHTML = '<div class="text-center py-4 text-svp-muted">' +
+                        '<i class="bi bi-archive" style="font-size: 2rem;"></i>' +
+                        '<p class="mt-2 mb-0" style="font-size: 0.8125rem;">No recordings yet</p></div>';
+                    return;
+                }
+
+                var html = '<table class="table table-hover mb-0"><thead><tr>' +
+                    '<th>ID</th><th>Timestamp</th><th>Path</th><th>Status</th>' +
+                    '</tr></thead><tbody>';
+
+                records.forEach(function(r) {
+                    var statusClass = r.status === 'AUTO_PUBLISHED' ? 'bg-success' :
+                        (r.status === 'PENDING_REVIEW' ? 'bg-warning text-dark' :
+                        (r.status === 'REJECTED' || r.status === 'ERROR' ? 'bg-danger' : 'bg-secondary'));
+                    var ts = new Date(r.timestamp).toLocaleString('en-US', {
+                        month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+                    });
+
+                    html += '<tr>' +
+                        '<td><code class="text-accent">' + r.id + '</code></td>' +
+                        '<td class="text-svp-muted" style="font-size:0.75rem;">' + ts + '</td>' +
+                        '<td><code>' + (r.rawLog ? r.rawLog.request.path : '--') + '</code></td>' +
+                        '<td><span class="badge ' + statusClass + '">' + r.status + '</span></td>' +
+                        '</tr>';
+                });
+
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            });
+    }
+</script>
+</body>
+</html>
