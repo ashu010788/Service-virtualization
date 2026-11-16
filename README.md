@@ -168,6 +168,7 @@ root
 Path variables (e.g. `{id}`) are extracted at match time and placed in `pathVariables` map for use in `{{request.pathVar.id}}` templates.
 
 ### 2. gRPC Index — HashMap of method → List<Stub>
+Specifity purpose:- the engine always tries the stub with the most conditions first, and only falls through to a broader/fallback stub if the specific one's extra conditions genuinely don't match this particular request. That's the whole point of specificity scoring
 
 ```
 grpcIndex: ConcurrentHashMap<String, List<StubDefinition>>
@@ -733,7 +734,7 @@ curl -s -X POST http://localhost:8080/orders/place \
 # ═══════════════════════════════════════════════════════════════════════
 
 # 3a. Check recording history — should show AUTO_PUBLISHED
-curl -s http://localhost:8080/api/v1/recording/history?limit=1 | python3 -m json.tool
+curl -s "http://localhost:8080/api/v1/recording/history?limit=1" | python3 -m json.tool
 # → [{"id": "rec-xxxx", "status": "AUTO_PUBLISHED",
 #     "rawLog": {"request": {"path": "/orders/place", "method": "POST", ...}}}]
 
