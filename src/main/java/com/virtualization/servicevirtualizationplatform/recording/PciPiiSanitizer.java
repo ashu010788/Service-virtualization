@@ -60,11 +60,14 @@ public class PciPiiSanitizer {
             "width", "height", "length", "size", "age", "limit", "threshold",
 
             // ── Entity IDs ──
+            "id", "uuid",
             "account_id", "payment_id", "order_id", "transaction_id", "merchant_id",
             "customer_id", "refund_id", "transfer_id", "shipment_id", "tracking_id",
             "product_id", "item_id", "invoice_id", "receipt_id", "ticket_id",
             "employee_id", "user_id", "session_id", "request_id", "correlation_id",
             "checkout_id", "batch_id", "job_id", "event_id", "message_id",
+            "sku_id", "store_id", "warehouse_id", "location_id", "vendor_id",
+            "supplier_id", "contract_id", "policy_id", "claim_id", "case_id",
 
             // ── Timestamps / dates ──
             "created_at", "updated_at", "timestamp", "date", "time",
@@ -81,10 +84,28 @@ public class PciPiiSanitizer {
             "origin", "route", "method", "mode", "service_level",
             "delivery_date", "ship_date", "estimated_delivery",
 
-            // ── Product / catalog ──
+            // ── Product / catalog / inventory ──
             "category", "brand", "sku", "upc", "model", "color", "material",
             "department", "aisle", "shelf", "vendor", "supplier",
             "card_type", "card_brand",
+            "stock", "inventory", "warehouse_code", "store_number",
+            "aisle_number", "shelf_number",
+
+            // ── Account / holder ──
+            "account_holder", "account_name", "holder", "holder_name",
+            "account_type", "account_status",
+
+            // ── Person (non-PII business names) ──
+            "first_name", "last_name", "full_name", "display_name", "nickname",
+
+            // ── Business / organization ──
+            "company", "organization", "org_name", "title", "position",
+
+            // ── HTTP / API meta ──
+            "url", "uri", "path", "endpoint", "content_type", "accept", "user_agent",
+
+            // ── Response meta / errors ──
+            "error", "error_code", "error_message", "success", "response_code",
 
             // ── Business state / classification ──
             "username", "tier", "reason", "source", "channel", "platform",
@@ -94,7 +115,9 @@ public class PciPiiSanitizer {
 
             // ── Boolean-ish / flag names ──
             "enabled", "active", "verified", "approved", "processed",
-            "ack", "confirmed", "completed", "visible", "available"
+            "ack", "confirmed", "completed", "visible", "available",
+            "deleted", "archived", "published", "pending", "cancelled",
+            "expired", "locked", "read_only"
     );
 
     // Luhn lookup table for fast digit doubling
@@ -339,6 +362,11 @@ public class PciPiiSanitizer {
 
         // LAYER 4: Heuristic safe check
         if (value instanceof String strVal) {
+            // Template expressions ({{generate.id:*}}, {{request.body.*}}, {{state.*}}, etc.)
+            // are our own DSL placeholders, never real user data — always safe.
+            if (strVal.startsWith("{{") && strVal.endsWith("}}")) {
+                return new FieldClassificationResult(fieldName, value, FieldClassification.SAFE_ENUM, "KEPT", 4);
+            }
             if (strVal.length() <= 20 && strVal.matches("[A-Za-z][A-Za-z ]*")) {
                 return new FieldClassificationResult(fieldName, value, FieldClassification.SAFE_ENUM, "KEPT", 4);
             }

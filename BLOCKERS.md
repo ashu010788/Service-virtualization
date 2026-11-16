@@ -8,7 +8,7 @@
 
 During **batch recording** (ingesting multiple related requests in sequence), the auto-generated stubs can get issues for `stateAction` WRITE/READ wired correctly for **individual** endpoints. 
 
-1. **Which body field** should serve as the state key linking the POST response to a later GET lookup (is it `account_id`, `order_id`, `customer_id`, or a nested field like `$.data.ref`?).
+1. **Which body field** should serve as the state key linking the POST response to a later GET lookup (is it `account_id`, `order_id`, `customer_id`) id can be many names.
 2. **Which collection name** to share so that a stub on `/api/v1/orders` can read state written by a stub on `/api/v1/accounts`.
 3. **Which response fields** from the creating request should be carried forward into the reading request's `keyExpr` / `valueExpr`.
 
