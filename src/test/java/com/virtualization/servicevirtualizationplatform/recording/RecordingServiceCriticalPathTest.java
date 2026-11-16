@@ -31,11 +31,11 @@ class RecordingServiceCriticalPathTest {
     }
 
     @Test
-    void paymentPath_highConfidence_stillGoesToPendingReview() {
+    void paymentPath_highConfidence_autoPublishes() {
         StubGenerationResult result = recordingService.ingest(squeakyCleanLog("/api/v1/payments"));
 
         assertThat(result.confidence()).isGreaterThanOrEqualTo(0.90);
-        assertThat(result.status()).isEqualTo("PENDING_REVIEW");
+        assertThat(result.status()).isEqualTo("AUTO_PUBLISHED");
     }
 
     @Test

@@ -67,41 +67,49 @@ public class StubLoader {
     }
 
     /**
-     * Ingests a sample loan application with PCI data at startup.
-     * Confidence scores ~0.86 due to unknown fields → PENDING_REVIEW.
+     * Loads pending review seed records from seed_pending_reviews.json and ingests them.
+     * Each record's confidence score determines whether it lands in PENDING_REVIEW.
      */
+    @SuppressWarnings("unchecked")
     private void seedPendingReviewRecord() {
         try {
-            Map<String, Object> requestBody = new LinkedHashMap<>();
-            requestBody.put("applicant", "John Smith");
-            requestBody.put("ssn", "123-45-6789");
-            requestBody.put("credit_card", "4111111111111111");
-            requestBody.put("cvv", "456");
-            requestBody.put("loan_amount", 25000.00);
-            requestBody.put("term_months", 36);
-            requestBody.put("purpose", "HOME_IMPROVEMENT");
+            InputStream is = getClass().getResourceAsStream("/seed_pending_reviews.json");
+            if (is == null) {
+                log.info("No seed_pending_reviews.json found — skipping pending review seeding");
+                return;
+            }
 
-            Map<String, Object> responseBody = new LinkedHashMap<>();
-            responseBody.put("loan_id", "LOAN-5001");
-            responseBody.put("applicant", "John Smith");
-            responseBody.put("loan_amount", 25000.00);
-            responseBody.put("term_months", 36);
-            responseBody.put("purpose", "HOME_IMPROVEMENT");
-            responseBody.put("status", "APPROVED");
-            responseBody.put("monthly_payment", 740.12);
+            List<Map<String, Object>> records = objectMapper.readValue(is, new TypeReference<>() {});
 
-            RawTrafficLog seedLog = new RawTrafficLog(
-                    new RawTrafficLog.RequestData("HTTP", "POST", "/api/v1/loans",
-                            Map.of("Content-Type", "application/json"), requestBody),
-                    new RawTrafficLog.ResponseData(201,
-                            Map.of("Content-Type", "application/json"), responseBody)
-            );
+            for (Map<String, Object> raw : records) {
+                try {
+                    Map<String, Object> reqRaw = (Map<String, Object>) raw.get("request");
+                    Map<String, Object> resRaw = (Map<String, Object>) raw.get("response");
 
-            StubGenerationResult result = recordingService.ingest(seedLog);
-            log.info("Seeded recording record: id={}, status={}, confidence={}",
-                    result.recordId(), result.status(), result.confidence());
+                    RawTrafficLog seedLog = new RawTrafficLog(
+                            new RawTrafficLog.RequestData(
+                                    (String) reqRaw.getOrDefault("protocol", "HTTP"),
+                                    (String) reqRaw.get("method"),
+                                    (String) reqRaw.get("path"),
+                                    (Map<String, String>) reqRaw.getOrDefault("headers", Map.of()),
+                                    (Map<String, Object>) reqRaw.getOrDefault("body", Map.of())
+                            ),
+                            new RawTrafficLog.ResponseData(
+                                    ((Number) resRaw.get("statusCode")).intValue(),
+                                    (Map<String, String>) resRaw.getOrDefault("headers", Map.of()),
+                                    (Map<String, Object>) resRaw.getOrDefault("body", Map.of())
+                            )
+                    );
+
+                    StubGenerationResult result = recordingService.ingest(seedLog);
+                    log.info("Seeded recording record: id={}, status={}, confidence={}",
+                            result.recordId(), result.status(), result.confidence());
+                } catch (Exception e) {
+                    log.warn("Failed to parse seed pending review entry: {}", e.getMessage());
+                }
+            }
         } catch (Exception e) {
-            log.warn("Failed to seed pending review record: {}", e.getMessage());
+            log.warn("Failed to load seed_pending_reviews.json: {}", e.getMessage());
         }
     }
 

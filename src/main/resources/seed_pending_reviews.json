@@ -1,0 +1,36 @@
+[
+  {
+    "request": {
+      "protocol": "HTTP",
+      "method": "POST",
+      "path": "/api/v1/loans/seedAtStartup",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "applicant": "John Smith",
+        "ssn": "123-45-6789",
+        "credit_card": "4111111111111111",
+        "cvv": "456",
+        "loan_amount": 25000.00,
+        "term_months": 36,
+        "purpose": "HOME_IMPROVEMENT"
+      }
+    },
+    "response": {
+      "statusCode": 201,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "loan_id": "LOAN-5001",
+        "applicant": "John Smith",
+        "loan_amount": 25000.00,
+        "term_months": 36,
+        "purpose": "HOME_IMPROVEMENT",
+        "status": "APPROVED",
+        "monthly_payment": 740.12
+      }
+    }
+  }
+]

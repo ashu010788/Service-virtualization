@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class CriticalPathClassifier {
 
-    private static final String[] CRITICAL_KEYWORDS = {"payment"};
+    private static final String[] CRITICAL_KEYWORDS = {"card"};
 
     public boolean isCritical(String path) {
         if (path == null) return false;
