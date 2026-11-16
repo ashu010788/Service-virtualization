@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head th:replace="~{fragments/head :: common}">
@@ -40,11 +41,31 @@
         </div>
     </div>
 
+    <!-- Search -->
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <form class="row g-2 align-items-end" method="get" th:action="@{/ui/sessions}">
+                <div class="col-md-4">
+                    <label class="form-label">Search by Session ID</label>
+                    <input type="text" class="form-control form-control-sm" name="query"
+                           th:value="${query}" placeholder="e.g. cicd-runner-9842"/>
+                </div>
+                <div class="col-md-1">
+                    <button type="submit" class="btn btn-primary btn-sm w-100" title="Search">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Sessions List -->
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-person-badge me-2"></i>Active Sessions
-                (<span th:text="${#lists.size(sessions)}">0</span>)</span>
+                (<span th:text="${#lists.size(sessions)}">0</span><span
+                        th:if="${query != null and !query.isBlank()}"
+                        th:text="${' of ' + totalSessionCount}"></span>)</span>
             <button class="btn btn-sm btn-outline-secondary" onclick="location.reload()">
                 <i class="bi bi-arrow-clockwise"></i>
             </button>
@@ -78,7 +99,7 @@
                                     th:attr="onclick='viewSession(\'' + ${sess.sessionId()} + '\')'">
                                 <i class="bi bi-eye"></i>
                             </button>
-                            <button class="btn btn-outline-success btn-sm" title="Add Data"
+                            <button class="btn btn-outline-success btn-sm" title="Add Data / Send Request"
                                     th:attr="onclick='openAddData(\'' + ${sess.sessionId()} + '\')'">
                                 <i class="bi bi-plus-lg"></i>
                             </button>
@@ -97,7 +118,9 @@
             </table>
             <div th:if="${#lists.isEmpty(sessions)}" class="text-center py-5 text-svp-muted">
                 <i class="bi bi-person-x" style="font-size: 2.5rem;"></i>
-                <p class="mt-2 mb-0">No active sessions</p>
+                <p class="mt-2 mb-0" th:if="${query == null or query.isBlank()}">No active sessions</p>
+                <p class="mt-2 mb-0" th:unless="${query == null or query.isBlank()}"
+                   th:text="|No sessions matching '${query}'|"></p>
             </div>
         </div>
     </div>
@@ -132,40 +155,27 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <!-- Quick Actions -->
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Quick Add</label>
-                    <div class="d-flex gap-2 flex-wrap">
-                        <button class="btn btn-sm btn-outline-primary" onclick="quickAdd('account')">
-                            <i class="bi bi-bank me-1"></i>Account
-                        </button>
-                        <button class="btn btn-sm btn-outline-success" onclick="quickAdd('payment')">
-                            <i class="bi bi-credit-card me-1"></i>Payment
-                        </button>
-                        <button class="btn btn-sm btn-outline-info" onclick="quickAdd('transfer')">
-                            <i class="bi bi-arrow-left-right me-1"></i>Transfer
-                        </button>
-                        <button class="btn btn-sm btn-outline-warning" onclick="quickAdd('customer')">
-                            <i class="bi bi-person me-1"></i>Customer
-                        </button>
-                    </div>
-                </div>
-                <hr/>
                 <!-- Custom Request -->
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Or send custom virtual request</label>
+                    <label class="form-label fw-bold">Send custom virtual request</label>
                     <div class="row g-2 mb-2">
-                        <div class="col-md-3">
-                            <select class="form-select form-select-sm" id="addDataMethod">
-                                <option value="POST">POST</option>
-                                <option value="GET">GET</option>
-                                <option value="PUT">PUT</option>
-                                <option value="DELETE">DELETE</option>
+                        <div class="col-md-2">
+                            <label class="form-label" style="font-size:0.75rem;">Protocol</label>
+                            <select class="form-select form-select-sm" id="addDataProtocol">
+                                <option value="HTTP">HTTP</option>
+                                <option value="GRPC">gRPC</option>
+                                <option value="KAFKA">Kafka</option>
                             </select>
                         </div>
-                        <div class="col-md-9">
+                        <div class="col-md-3">
+                            <label class="form-label" style="font-size:0.75rem;">Method/Topic</label>
+                            <input type="text" class="form-control form-control-sm" id="addDataMethod"
+                                   placeholder="POST, or a Kafka topic"/>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label" style="font-size:0.75rem;">Path (HTTP only)</label>
                             <input type="text" class="form-control form-control-sm" id="addDataPath"
-                                   placeholder="/api/v1/accounts" value="/api/v1/accounts"/>
+                                   placeholder="/api/v1/accounts"/>
                         </div>
                     </div>
                     <textarea class="form-control form-control-sm" id="addDataBody" rows="5"
@@ -251,30 +261,8 @@
         modal.show();
     }
 
-    function quickAdd(type) {
-        var templates = {
-            account: {
-                method: 'POST', path: '/api/v1/accounts',
-                body: { account_holder: 'User-' + Date.now(), currency: 'USD', initial_deposit: Math.floor(Math.random() * 10000) }
-            },
-            payment: {
-                method: 'POST', path: '/api/v1/payments',
-                body: { from_account: 'ACC-001', to_account: 'ACC-002', amount: Math.floor(Math.random() * 500), currency: 'USD' }
-            },
-            transfer: {
-                method: 'POST', path: '/api/v1/transfers',
-                body: { from_account: 'ACC-A', to_account: 'ACC-B', amount: Math.floor(Math.random() * 200) }
-            },
-            customer: {
-                method: 'POST', path: '/api/v1/customers',
-                body: { name: 'Customer-' + Date.now(), email: 'cust@test.com', tier: 'GOLD' }
-            }
-        };
-        var t = templates[type];
-        sendVirtualRequest(addDataTargetSession, t.method, t.path, t.body);
-    }
-
     function sendCustomRequest() {
+        var protocol = document.getElementById('addDataProtocol').value;
         var method = document.getElementById('addDataMethod').value;
         var path = document.getElementById('addDataPath').value;
         var bodyText = document.getElementById('addDataBody').value;
@@ -287,12 +275,12 @@
                 return;
             }
         }
-        sendVirtualRequest(addDataTargetSession, method, path, body);
+        sendVirtualRequest(addDataTargetSession, protocol, method, path, body);
     }
 
-    function sendVirtualRequest(sessionId, method, path, body) {
+    function sendVirtualRequest(sessionId, protocol, method, path, body) {
         var payload = {
-            sessionId: sessionId, protocol: 'HTTP', method: method,
+            sessionId: sessionId, protocol: protocol, method: method,
             path: path, headers: {}, body: body
         };
         fetch('/api/v1/virtual', {

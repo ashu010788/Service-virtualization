@@ -1,0 +1,595 @@
+[
+  {
+    "stubId": "stub_account_create_v1",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "POST",
+      "pathPattern": "/api/v1/accounts",
+      "headers": {},
+      "bodyJsonPath": { "$.currency": "USD" }
+    },
+    "responseTemplate": {
+      "statusCode": 201,
+      "headers": { "Content-Type": "application/json" },
+      "body": {
+        "account_id": "{{generate.id:ACC}}",
+        "account_holder": "{{request.body.account_holder}}",
+        "balance": "{{request.body.initial_deposit}}",
+        "currency": "USD",
+        "status": "ACTIVE"
+      }
+    },
+    "stateAction": {
+      "op": "WRITE",
+      "collection": "accounts",
+      "keyExpr": "{{response.body.account_id}}",
+      "valueExpr": "{{response.body}}"
+    }
+  },
+  {
+    "stubId": "stub_account_create_eur_v1",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "POST",
+      "pathPattern": "/api/v1/accounts",
+      "headers": {},
+      "bodyJsonPath": { "$.currency": "EUR" }
+    },
+    "responseTemplate": {
+      "statusCode": 201,
+      "headers": { "Content-Type": "application/json" },
+      "body": {
+        "account_id": "{{generate.id:ACC}}",
+        "account_holder": "{{request.body.account_holder}}",
+        "balance": "{{request.body.initial_deposit}}",
+        "currency": "EUR",
+        "status": "ACTIVE"
+      }
+    },
+    "stateAction": {
+      "op": "WRITE",
+      "collection": "accounts",
+      "keyExpr": "{{response.body.account_id}}",
+      "valueExpr": "{{response.body}}"
+    }
+  },
+  {
+    "stubId": "stub_account_create_fallback_v1",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "POST",
+      "pathPattern": "/api/v1/accounts",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 201,
+      "headers": { "Content-Type": "application/json" },
+      "body": {
+        "account_id": "{{generate.id:ACC}}",
+        "account_holder": "{{request.body.account_holder}}",
+        "balance": "{{request.body.initial_deposit}}",
+        "currency": "{{request.body.currency}}",
+        "status": "ACTIVE"
+      }
+    },
+    "stateAction": {
+      "op": "WRITE",
+      "collection": "accounts",
+      "keyExpr": "{{response.body.account_id}}",
+      "valueExpr": "{{response.body}}"
+    }
+  },
+  {
+    "stubId": "stub_savings_account_create_v1",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "POST",
+      "pathPattern": "/api/v1/accounts",
+      "headers": {},
+      "bodyJsonPath": { "$.currency": "USD", "$.type": "SAVINGS" }
+    },
+    "responseTemplate": {
+      "statusCode": 201,
+      "headers": { "Content-Type": "application/json" },
+      "body": {
+        "account_id": "{{generate.id:ACC}}",
+        "account_holder": "{{request.body.account_holder}}",
+        "balance": "{{request.body.initial_deposit}}",
+        "currency": "USD",
+        "type": "SAVINGS",
+        "status": "ACTIVE"
+      }
+    },
+    "stateAction": {
+      "op": "WRITE",
+      "collection": "accounts",
+      "keyExpr": "{{response.body.account_id}}",
+      "valueExpr": "{{response.body}}"
+    }
+  },
+  {
+    "stubId": "stub_account_get_v1",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "GET",
+      "pathPattern": "/api/v1/accounts/{id}",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 200,
+      "headers": { "Content-Type": "application/json" },
+      "body": "{{state.result}}"
+    },
+    "stateAction": {
+      "op": "READ",
+      "collection": "accounts",
+      "keyExpr": "{{request.pathVar.id}}"
+    }
+  },
+  {
+    "stubId": "stub_account_not_found",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "GET",
+      "pathPattern": "/api/v1/accounts/{id}",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 404,
+      "headers": { "Content-Type": "application/json" },
+      "body": { "error": "Account not found" }
+    }
+  },
+  {
+    "stubId": "stub_account_update_v1",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "PUT",
+      "pathPattern": "/api/v1/accounts/{id}",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 200,
+      "headers": { "Content-Type": "application/json" },
+      "body": {
+        "account_id": "{{request.pathVar.id}}",
+        "account_holder": "{{request.body.account_holder}}",
+        "balance": "{{request.body.balance}}",
+        "status": "ACTIVE"
+      }
+    },
+    "stateAction": {
+      "op": "WRITE",
+      "collection": "accounts",
+      "keyExpr": "{{request.pathVar.id}}",
+      "valueExpr": "{{response.body}}"
+    }
+  },
+  {
+    "stubId": "stub_account_delete_v1",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "DELETE",
+      "pathPattern": "/api/v1/accounts/{id}",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 204,
+      "headers": {},
+      "body": {}
+    },
+    "stateAction": {
+      "op": "DELETE",
+      "collection": "accounts",
+      "keyExpr": "{{request.pathVar.id}}"
+    }
+  },
+  {
+    "stubId": "stub_account_list_v1",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "GET",
+      "pathPattern": "/api/v1/accounts",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 200,
+      "headers": { "Content-Type": "application/json" },
+      "body": { "accounts": [], "count": 0 }
+    }
+  },
+  {
+    "stubId": "stub_payment_create_v1",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "POST",
+      "pathPattern": "/api/v1/payments",
+      "headers": {},
+      "bodyJsonPath": { "$.currency": "USD" }
+    },
+    "responseTemplate": {
+      "statusCode": 201,
+      "headers": { "Content-Type": "application/json" },
+      "body": {
+        "payment_id": "{{generate.id:PAY}}",
+        "amount": "{{request.body.amount}}",
+        "currency": "USD",
+        "status": "COMPLETED"
+      }
+    },
+    "stateAction": {
+      "op": "WRITE",
+      "collection": "payments",
+      "keyExpr": "{{response.body.payment_id}}",
+      "valueExpr": "{{response.body}}"
+    },
+    "asyncEvents": [
+      {
+        "targetProtocol": "KAFKA",
+        "targetTopic": "payment-events",
+        "delayMs": 500,
+        "jitterMs": 100,
+        "eventBody": {
+          "event_type": "PAYMENT_COMPLETED",
+          "payment_id": "{{response.body.payment_id}}",
+          "amount": "{{request.body.amount}}",
+          "timestamp": "{{generate.timestamp}}"
+        }
+      }
+    ]
+  },
+  {
+    "stubId": "stub_payment_get_v1",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "GET",
+      "pathPattern": "/api/v1/payments/{id}",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 200,
+      "headers": { "Content-Type": "application/json" },
+      "body": "{{state.result}}"
+    },
+    "stateAction": {
+      "op": "READ",
+      "collection": "payments",
+      "keyExpr": "{{request.pathVar.id}}"
+    }
+  },
+  {
+    "stubId": "stub_payment_not_found",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "GET",
+      "pathPattern": "/api/v1/payments/{id}",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 404,
+      "headers": { "Content-Type": "application/json" },
+      "body": { "error": "Payment not found" }
+    }
+  },
+  {
+    "stubId": "stub_transfer_create_v1",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "POST",
+      "pathPattern": "/api/v1/transfers",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 201,
+      "headers": { "Content-Type": "application/json" },
+      "body": {
+        "transfer_id": "{{generate.id:TXF}}",
+        "from_account": "{{request.body.from_account}}",
+        "to_account": "{{request.body.to_account}}",
+        "amount": "{{request.body.amount}}",
+        "status": "COMPLETED"
+      }
+    },
+    "stateAction": {
+      "op": "WRITE",
+      "collection": "transfers",
+      "keyExpr": "{{response.body.transfer_id}}",
+      "valueExpr": "{{response.body}}"
+    }
+  },
+  {
+    "stubId": "stub_transfer_get_v1",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "GET",
+      "pathPattern": "/api/v1/transfers/{id}",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 200,
+      "headers": { "Content-Type": "application/json" },
+      "body": "{{state.result}}"
+    },
+    "stateAction": {
+      "op": "READ",
+      "collection": "transfers",
+      "keyExpr": "{{request.pathVar.id}}"
+    }
+  },
+  {
+    "stubId": "stub_transfer_not_found",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "GET",
+      "pathPattern": "/api/v1/transfers/{id}",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 404,
+      "headers": { "Content-Type": "application/json" },
+      "body": { "error": "Transfer not found" }
+    }
+  },
+  {
+    "stubId": "stub_customer_create_v1",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "POST",
+      "pathPattern": "/api/v1/customers",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 201,
+      "headers": { "Content-Type": "application/json" },
+      "body": {
+        "customer_id": "{{generate.id:CUS}}",
+        "name": "{{request.body.name}}",
+        "email": "{{request.body.email}}",
+        "tier": "{{request.body.tier}}",
+        "status": "ACTIVE"
+      }
+    },
+    "stateAction": {
+      "op": "WRITE",
+      "collection": "customers",
+      "keyExpr": "{{response.body.customer_id}}",
+      "valueExpr": "{{response.body}}"
+    }
+  },
+  {
+    "stubId": "stub_customer_create_us_v1",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "POST",
+      "pathPattern": "/api/v1/customers",
+      "headers": {},
+      "bodyJsonPath": { "$.address.country": "US" }
+    },
+    "responseTemplate": {
+      "statusCode": 201,
+      "headers": { "Content-Type": "application/json" },
+      "body": {
+        "customer_id": "{{generate.id:CUS}}",
+        "name": "{{request.body.name}}",
+        "country": "US",
+        "status": "ACTIVE"
+      }
+    },
+    "stateAction": {
+      "op": "WRITE",
+      "collection": "customers",
+      "keyExpr": "{{response.body.customer_id}}",
+      "valueExpr": "{{response.body}}"
+    }
+  },
+  {
+    "stubId": "stub_customer_get_v1",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "GET",
+      "pathPattern": "/api/v1/customers/{id}",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 200,
+      "headers": { "Content-Type": "application/json" },
+      "body": "{{state.result}}"
+    },
+    "stateAction": {
+      "op": "READ",
+      "collection": "customers",
+      "keyExpr": "{{request.pathVar.id}}"
+    }
+  },
+  {
+    "stubId": "stub_customer_not_found",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "GET",
+      "pathPattern": "/api/v1/customers/{id}",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 404,
+      "headers": { "Content-Type": "application/json" },
+      "body": { "error": "Customer not found" }
+    }
+  },
+  {
+    "stubId": "stub_grpc_create_account",
+    "requestMatcher": {
+      "protocol": "GRPC",
+      "method": "CreateAccount",
+      "pathPattern": "",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 200,
+      "headers": { "Content-Type": "application/grpc" },
+      "body": {
+        "account_id": "{{generate.id:ACC}}",
+        "account_holder": "{{request.body.account_holder}}",
+        "status": "ACTIVE"
+      }
+    },
+    "stateAction": {
+      "op": "WRITE",
+      "collection": "accounts",
+      "keyExpr": "{{response.body.account_id}}",
+      "valueExpr": "{{response.body}}"
+    }
+  },
+  {
+    "stubId": "stub_grpc_get_balance_v1",
+    "requestMatcher": {
+      "protocol": "GRPC",
+      "method": "GetBalance",
+      "pathPattern": "",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 200,
+      "headers": { "Content-Type": "application/grpc" },
+      "body": {
+        "account_id": "{{request.body.account_id}}",
+        "balance": 1000.00,
+        "currency": "USD"
+      }
+    }
+  },
+  {
+    "stubId": "stub_grpc_process_payment_v1",
+    "requestMatcher": {
+      "protocol": "GRPC",
+      "method": "ProcessPayment",
+      "pathPattern": "",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 200,
+      "headers": { "Content-Type": "application/grpc" },
+      "body": {
+        "payment_id": "{{generate.id:PAY}}",
+        "status": "PROCESSED",
+        "amount": "{{request.body.amount}}"
+      }
+    }
+  },
+  {
+    "stubId": "stub_kafka_payment_completed",
+    "requestMatcher": {
+      "protocol": "KAFKA",
+      "method": "payment-events",
+      "pathPattern": "",
+      "headers": {},
+      "bodyJsonPath": { "$.event_type": "PAYMENT_COMPLETED" }
+    },
+    "responseTemplate": {
+      "statusCode": 200,
+      "headers": {},
+      "body": {
+        "ack": true,
+        "event_type": "PAYMENT_COMPLETED",
+        "processed": true
+      }
+    }
+  },
+  {
+    "stubId": "stub_kafka_account_event_v1",
+    "requestMatcher": {
+      "protocol": "KAFKA",
+      "method": "account.events",
+      "pathPattern": "",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 200,
+      "headers": {},
+      "body": {
+        "ack": true,
+        "event_type": "{{request.body.event_type}}",
+        "processed": true
+      }
+    }
+  },
+  {
+    "stubId": "stub_account_transaction_create_v1",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "POST",
+      "pathPattern": "/api/v1/accounts/{id}/transactions",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 201,
+      "headers": { "Content-Type": "application/json" },
+      "body": {
+        "transaction_id": "{{generate.id:TXN}}",
+        "account_id": "{{request.pathVar.id}}",
+        "amount": "{{request.body.amount}}",
+        "type": "{{request.body.type}}",
+        "status": "POSTED"
+      }
+    },
+    "stateAction": {
+      "op": "WRITE",
+      "collection": "transactions",
+      "keyExpr": "{{request.pathVar.id}}:{{response.body.transaction_id}}",
+      "valueExpr": "{{response.body}}"
+    }
+  },
+  {
+    "stubId": "stub_account_transaction_get_v1",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "GET",
+      "pathPattern": "/api/v1/accounts/{id}/transactions/{transactionId}",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 200,
+      "headers": { "Content-Type": "application/json" },
+      "body": "{{state.result}}"
+    },
+    "stateAction": {
+      "op": "READ",
+      "collection": "transactions",
+      "keyExpr": "{{request.pathVar.id}}:{{request.pathVar.transactionId}}"
+    }
+  },
+  {
+    "stubId": "stub_account_transaction_not_found",
+    "requestMatcher": {
+      "protocol": "HTTP",
+      "method": "GET",
+      "pathPattern": "/api/v1/accounts/{id}/transactions/{transactionId}",
+      "headers": {},
+      "bodyJsonPath": {}
+    },
+    "responseTemplate": {
+      "statusCode": 404,
+      "headers": { "Content-Type": "application/json" },
+      "body": { "error": "Transaction not found" }
+    }
+  }
+]

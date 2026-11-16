@@ -24,6 +24,18 @@ public class StubRegistry {
         stubRouter.register(stub);
     }
 
+    /**
+     * Register a stub, upserting by stubId only (manual stub-authoring API).
+     * Does NOT replace on matcher-equality-with-different-stubId — see
+     * {@link StubRouter#registerOrReplace} for why that would break intentional
+     * same-matcher candidate chains (e.g. found/not-found pairs).
+     *
+     * @return the replaced stubId as a single-element list, or empty if this was new.
+     */
+    public List<String> registerOrReplace(StubDefinition stub) {
+        return stubRouter.registerOrReplace(stub);
+    }
+
     public void remove(String stubId) {
         stubRouter.remove(stubId);
     }
@@ -40,12 +52,27 @@ public class StubRegistry {
         stubRouter.toggleStub(stubId);
     }
 
+    /**
+     * Updates a stub's governance TTL (expiresAt). Unlike updateResponseTemplate, this does NOT
+     * remove+re-register through the trie — expiresAt doesn't affect requestMatcher or trie
+     * placement at all, so a direct mutation (StubDefinition#setExpiresAt is already a
+     * volatile-backed mutator, same pattern as isEnabled/setEnabled) is simpler and correct.
+     *
+     * @return false if the stub doesn't exist, true otherwise.
+     */
+    public boolean updateExpiry(String stubId, java.time.Instant expiresAt) {
+        StubDefinition existing = stubRouter.getById(stubId);
+        if (existing == null) return false;
+        existing.setExpiresAt(expiresAt);
+        return true;
+    }
+
     public void updateResponseTemplate(String stubId, ResponseTemplate newResponse) {
         StubDefinition existing = stubRouter.getById(stubId);
         if (existing == null) return;
 
         StubDefinition updated = new StubDefinition(
-                existing.stubId(), existing.priority(),
+                existing.stubId(),
                 existing.requestMatcher(), newResponse,
                 existing.stateAction(), existing.asyncEvents(),
                 existing.source(), existing.apiVersion(), existing.expiresAt()

@@ -44,6 +44,51 @@ public class PathTrie {
         this.root = newRoot;
     }
 
+    /**
+     * Full compaction: throws away the current tree and rebuilds it from scratch using whatever
+     * the supplier returns. remove() never prunes a TrieNode once created — only the
+     * StubDefinition entries stored on it — so a node for "/api/v1/accounts/{id}" stays
+     * allocated forever even after every stub registered there has been deleted. Calling this
+     * periodically (see StubGovernanceScheduler) throws away that dead structure for free: a
+     * freshly built tree only ever contains nodes for segments that have at least one live
+     * stub under them, because doInsert is the only thing that ever creates a TrieNode.
+     *
+     * IMPORTANT — takes a Supplier, not a pre-built Collection: confirmed bug fixed here. If
+     * the caller snapshots stubsById BEFORE calling this method, there's a lost-update race
+     * against concurrent register()/remove() calls — a stub could finish stubsById.put(X)
+     * right between that outside snapshot and this method's lock acquisition, so the rebuilt
+     * trie silently excludes X even though stubsById still has it (X stops matching forever,
+     * until the next compaction). Evaluating the supplier INSIDE the synchronized block means
+     * it shares PathTrie's single monitor with insert()/remove(), so the snapshot can only ever
+     * be taken strictly-before or strictly-after any given register()/remove() call completes
+     * its own trie mutation — never lost in between. The only residual race is benign: a stub
+     * registered concurrently can transiently double-insert (self-heals on its next removal,
+     * since removeIf() strips every matching entry, not just one) — never silently vanish.
+     */
+    public synchronized void rebuild(java.util.function.Supplier<Collection<StubDefinition>> stubSupplier) {
+        TrieNode newRoot = new TrieNode();
+        for (StubDefinition stub : stubSupplier.get()) {
+            doInsert(newRoot, stub);
+        }
+        this.root = newRoot;
+    }
+
+    /** Total TrieNode count in the current tree — exposed for governance/observability and tests. */
+    public int nodeCount() {
+        return countNodes(this.root);
+    }
+
+    private int countNodes(TrieNode node) {
+        int count = 1; // this node
+        for (TrieNode child : node.children.values()) {
+            count += countNodes(child);
+        }
+        if (node.wildcardChild != null) {
+            count += countNodes(node.wildcardChild);
+        }
+        return count;
+    }
+
     public int size() {
         return countStubs(this.root);
     }
@@ -92,8 +137,11 @@ public class PathTrie {
             if (seg.startsWith("{") && seg.endsWith("}")) {
                 if (current.wildcardChild == null) {
                     current.wildcardChild = new TrieNode();
-                    current.wildcardName = seg.substring(1, seg.length() - 1);
                 }
+                // Always update wildcardName — convention: all stubs at the same path
+                // position should use the same parameter name. Last registered wins.
+                // Different names for the same position are a user-configuration error.
+                current.wildcardName = seg.substring(1, seg.length() - 1);
                 current = current.wildcardChild;
             } else {
                 current = current.children.computeIfAbsent(seg, k -> new TrieNode());
@@ -102,8 +150,9 @@ public class PathTrie {
 
         String method = stub.requestMatcher().method().toUpperCase();
         current.stubs.computeIfAbsent(method, k -> new ArrayList<>()).add(stub);
+        // Stable sort: more specific (more conditions) first; insertion order breaks ties
         current.stubs.get(method).sort(
-                Comparator.comparingInt(StubDefinition::priority).reversed());
+                Comparator.comparingInt(StubDefinition::specificity).reversed());
     }
 
     // ═══ REMOVE IMPLEMENTATION ═══

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/head :: common}">
+    <title>Stubs | SVP</title>
+</head>
+<body>
+
+<div th:replace="~{fragments/navbar :: sidebar}"></div>
+
+<div class="main-content">
+    <div class="page-header d-flex justify-content-between align-items-start">
+        <div>
+            <h1>Stub Management</h1>
+            <p>View, search, and toggle virtual service stubs</p>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <span class="badge bg-success" th:text="${activeCount + ' active'}">0 active</span>
+            <span class="badge bg-danger" th:text="${disabledCount + ' disabled'}">0 disabled</span>
+            <span class="badge bg-secondary" th:text="${totalCount + ' total'}">0 total</span>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <form class="row g-2 align-items-end" method="get" th:action="@{/ui/stubs}">
+                <div class="col-md-3">
+                    <label class="form-label">Search</label>
+                    <input type="text" class="form-control form-control-sm" name="query"
+                           th:value="${query}" placeholder="Search by stub ID, path..."/>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Protocol</label>
+                    <select class="form-select form-select-sm" name="protocol">
+                        <option value="">All</option>
+                        <option value="HTTP" th:selected="${protocol == 'HTTP'}">HTTP</option>
+                        <option value="GRPC" th:selected="${protocol == 'GRPC'}">gRPC</option>
+                        <option value="KAFKA" th:selected="${protocol == 'KAFKA'}">Kafka</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Method/Topic</label>
+                    <input type="text" class="form-control form-control-sm" name="method"
+                           th:value="${method}" placeholder="GET, POST, payment-events..."/>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Status</label>
+                    <select class="form-select form-select-sm" name="enabled">
+                        <option value="">All</option>
+                        <option value="true" th:selected="${enabled == 'true'}">Enabled</option>
+                        <option value="false" th:selected="${enabled == 'false'}">Disabled</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Sort By</label>
+                    <select class="form-select form-select-sm" name="sortBy">
+                        <option value="specificity" th:selected="${sortBy == 'specificity'}">Specificity</option>
+                        <option value="id" th:selected="${sortBy == 'id'}">Stub ID (A-Z)</option>
+                        <option value="created" th:selected="${sortBy == 'created'}">Newest First</option>
+                        <option value="lastUsed" th:selected="${sortBy == 'lastUsed'}">Recently Used</option>
+                        <option value="matchCount" th:selected="${sortBy == 'matchCount'}">Most Matched</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <button type="submit" class="btn btn-primary btn-sm w-100" title="Filter">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Stubs Table -->
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0" th:if="${not #lists.isEmpty(stubs)}">
+                <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Stub ID</th>
+                    <th>Protocol</th>
+                    <th>Method/Topic</th>
+                    <th>Path Pattern</th>
+                    <th>Specificity</th>
+                    <th>Matches</th>
+                    <th>Source</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="stub : ${stubs}">
+                    <td>
+                        <span class="badge"
+                              th:classappend="${stub.isEnabled() ? 'bg-success' : 'bg-danger'}"
+                              th:text="${stub.isEnabled() ? 'Enabled' : 'Disabled'}">Enabled</span>
+                    </td>
+                    <td>
+                        <a href="#" class="text-accent text-decoration-none"
+                           data-bs-toggle="modal" data-bs-target="#stubDetailModal"
+                           th:text="${stub.stubId()}"
+                           th:data-stub-id="${stub.stubId()}"
+                           onclick="loadStubDetail(this.getAttribute('data-stub-id'))">stub-1</a>
+                    </td>
+                    <td>
+                        <span class="badge badge-protocol"
+                              th:classappend="${stub.requestMatcher().protocol().toUpperCase() == 'HTTP' ? 'badge-http' : (stub.requestMatcher().protocol().toUpperCase() == 'GRPC' ? 'badge-grpc' : 'badge-kafka')}"
+                              th:text="${stub.requestMatcher().protocol()}">HTTP</span>
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary" th:text="${stub.requestMatcher().method()}">GET</span>
+                    </td>
+                    <td>
+                        <code th:text="${stub.requestMatcher().pathPattern()}">/api/test</code>
+                    </td>
+                    <td th:text="${stub.specificity()}">10</td>
+                    <td>
+                        <span th:text="${stub.matchCount()}"
+                              th:class="${stub.matchCount() > 0 ? 'text-svp-green' : 'text-svp-muted'}">0</span>
+                    </td>
+                    <td>
+                        <span class="badge"
+                              th:classappend="${stub.source() == 'auto-generated' ? 'bg-info' : 'bg-secondary'}"
+                              th:text="${stub.source()}">manual</span>
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-info btn-sm" title="Edit Response"
+                                    th:data-stub-id="${stub.stubId()}"
+                                    onclick="loadStubForEdit(this.getAttribute('data-stub-id'))">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <!-- Neutral color on purpose: this is an ACTION button (what will
+                                 happen when clicked), not a status indicator. The Status badge
+                                 in the first column is the single source of truth for current
+                                 enabled/disabled state — coloring this button red/green too
+                                 previously made every row (all stubs enabled by default) show a
+                                 red button, which read as "this stub is disabled" even though
+                                 red meant "click to disable this currently-ACTIVE stub". -->
+                            <button class="btn btn-outline-secondary btn-sm toggle-stub-btn"
+                                    th:title="${stub.isEnabled() ? 'Disable this stub' : 'Enable this stub'}"
+                                    th:data-stub-id="${stub.stubId()}"
+                                    th:data-enabled="${stub.isEnabled()}"
+                                    onclick="toggleStubRow(this, this.getAttribute('data-stub-id'))">
+                                <i class="bi" th:classappend="${stub.isEnabled() ? 'bi-toggle-on' : 'bi-toggle-off'}"></i>
+                                <span th:text="${stub.isEnabled() ? 'Disable' : 'Enable'}">Disable</span>
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" title="Delete"
+                                    th:data-stub-id="${stub.stubId()}"
+                                    onclick="deleteStubRow(this.getAttribute('data-stub-id'))">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            <div th:if="${#lists.isEmpty(stubs)}" class="text-center py-5 text-svp-muted">
+                <i class="bi bi-file-earmark-x" style="font-size: 2.5rem;"></i>
+                <p class="mt-2 mb-0">No stubs found matching your criteria</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stub Detail Modal -->
+<div class="modal fade" id="stubDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Stub Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="stubDetailContent">
+                    <div class="text-center py-3 text-svp-muted">
+                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                        <span class="ms-2">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Response Template Modal -->
+<div class="modal fade" id="editResponseModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Edit Response Template</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-2">
+                    <span class="text-svp-muted">Stub:</span>
+                    <code class="text-accent" id="editStubIdLabel"></code>
+                </div>
+                <div class="mb-2">
+                    <span class="text-svp-muted">Matches:</span>
+                    <code id="editStubPathLabel"></code>
+                </div>
+                <hr/>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Status Code</label>
+                        <input type="number" class="form-control" id="editStatusCode2" value="200"/>
+                    </div>
+                    <div class="col-md-9">
+                        <label class="form-label fw-bold">Headers</label>
+                        <input type="text" class="form-control form-control-sm" id="editHeaders2"
+                               value='{"Content-Type":"application/json"}' readonly/>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <label class="form-label fw-bold">Response Body (JSON)</label>
+                    <p class="text-svp-muted" style="font-size:0.75rem;">
+                        Supports templates: <code>{<!-- -->{request.body.field}}</code>,
+                        <code>{<!-- -->{generate.id:PREFIX}}</code>,
+                        <code>{<!-- -->{state.result}}</code>
+                    </p>
+                    <textarea class="form-control" id="editResponseBody2" rows="12"
+                              style="font-family:monospace;font-size:0.85rem;"></textarea>
+                </div>
+                <div id="editResult2" class="mt-3"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="saveEditedResponse()">
+                    <i class="bi bi-save me-1"></i>Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    var currentStubId = null;
+
+    function loadStubDetail(stubId) {
+        currentStubId = stubId;
+        document.getElementById('stubDetailContent').innerHTML =
+            '<div class="text-center py-3 text-svp-muted"><div class="spinner-border spinner-border-sm"></div><span class="ms-2">Loading...</span></div>';
+        fetch('/api/v1/stubs/' + stubId)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                // Read-only view. Editing lives in ONE place — the pencil-icon Edit Response
+                // modal (loadStubForEdit/saveEditedResponse) — this used to duplicate that same
+                // editor inline in a second tab here, with its own copy of the save logic that
+                // could silently drift from the other one. "Edit Response" below just jumps there.
+                var html = '<pre style="max-height:400px;overflow:auto;">' + JSON.stringify(data, null, 2) + '</pre>';
+                html += '<button class="btn btn-outline-info btn-sm" onclick="bootstrap.Modal.getInstance(document.getElementById(\'stubDetailModal\')).hide(); loadStubForEdit(\'' + stubId + '\');">';
+                html += '<i class="bi bi-pencil me-1"></i>Edit Response</button>';
+                document.getElementById('stubDetailContent').innerHTML = html;
+            })
+            .catch(function(err) {
+                document.getElementById('stubDetailContent').innerHTML =
+                    '<div class="text-svp-red">Failed to load: ' + err.message + '</div>';
+            });
+    }
+
+    function loadStubForEdit(stubId) {
+        currentStubId = stubId;
+        document.getElementById('editResult2').innerHTML = '';
+        fetch('/api/v1/stubs/' + stubId)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var rt = data.responseTemplate || {};
+                var rm = data.requestMatcher || {};
+                document.getElementById('editStubIdLabel').textContent = stubId;
+                document.getElementById('editStubPathLabel').textContent =
+                    rm.method + ' ' + rm.pathPattern + ' [' + rm.protocol + ']';
+                document.getElementById('editStatusCode2').value = rt.statusCode || 200;
+                document.getElementById('editResponseBody2').value =
+                    JSON.stringify(rt.body || {}, null, 2);
+                var modal = new bootstrap.Modal(document.getElementById('editResponseModal'));
+                modal.show();
+            })
+            .catch(function(err) { alert('Failed to load stub: ' + err.message); });
+    }
+
+    function saveEditedResponse() {
+        var statusCode = parseInt(document.getElementById('editStatusCode2').value);
+        var bodyText = document.getElementById('editResponseBody2').value;
+        try {
+            var body = JSON.parse(bodyText);
+        } catch(e) {
+            document.getElementById('editResult2').innerHTML =
+                '<div class="alert alert-danger py-1 px-2">Invalid JSON: ' + e.message + '</div>';
+            return;
+        }
+        var payload = { statusCode: statusCode, headers: {"Content-Type": "application/json"}, body: body };
+        fetch('/api/v1/stubs/' + currentStubId + '/response', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.getElementById('editResult2').innerHTML =
+                '<div class="alert alert-success py-1 px-2"><i class="bi bi-check-circle me-1"></i>Response template saved</div>';
+            setTimeout(function() { location.reload(); }, 900);
+        })
+        .catch(function(err) {
+            document.getElementById('editResult2').innerHTML =
+                '<div class="alert alert-danger py-1 px-2">Error: ' + err.message + '</div>';
+        });
+    }
+
+    function toggleStubRow(btn, stubId) {
+        fetch('/api/v1/stubs/' + stubId + '/toggle', { method: 'POST' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var row = btn.closest('tr');
+                var statusBadge = row.querySelector('td:first-child .badge');
+                var icon = btn.querySelector('i.bi');
+                var label = btn.querySelector('span');
+
+                if (data.enabled) {
+                    statusBadge.className = 'badge bg-success';
+                    statusBadge.textContent = 'Enabled';
+                    icon.className = 'bi bi-toggle-on';
+                    label.textContent = 'Disable';
+                    btn.title = 'Disable this stub';
+                } else {
+                    statusBadge.className = 'badge bg-danger';
+                    statusBadge.textContent = 'Disabled';
+                    icon.className = 'bi bi-toggle-off';
+                    label.textContent = 'Enable';
+                    btn.title = 'Enable this stub';
+                }
+            })
+            .catch(function(err) { alert('Failed to toggle stub: ' + err.message); });
+    }
+
+    function deleteStubRow(stubId) {
+        if (!confirm('Delete stub "' + stubId + '"? This cannot be undone.')) return;
+        fetch('/api/v1/stubs/' + stubId, { method: 'DELETE' })
+            .then(function(r) {
+                if (!r.ok) throw new Error('Server returned ' + r.status);
+                location.reload();
+            })
+            .catch(function(err) { alert('Failed to delete stub: ' + err.message); });
+    }
+
+</script>
+</body>
+</html>

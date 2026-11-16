@@ -31,9 +31,10 @@ public class TrafficController {
             @RequestParam(required = false) String path,
             @RequestParam(required = false) String stubId,
             @RequestParam(required = false) Integer statusCode,
+            @RequestParam(required = false) String protocol,
             @RequestParam(defaultValue = "50") int limit) {
         return ResponseEntity.ok(trafficLogger.search(sessionId, method, path,
-                stubId, statusCode, limit));
+                stubId, statusCode, protocol, limit));
     }
 
     @DeleteMapping

@@ -54,6 +54,7 @@
                     <table class="table table-hover mb-0" th:if="${not #lists.isEmpty(recentTraffic)}">
                         <thead>
                         <tr>
+                            <th>Protocol</th>
                             <th>Method</th>
                             <th>Path</th>
                             <th>Stub</th>
@@ -63,6 +64,11 @@
                         </thead>
                         <tbody>
                         <tr th:each="entry : ${recentTraffic}">
+                            <td>
+                                <span class="badge badge-protocol"
+                                      th:classappend="${entry.protocol() != null and entry.protocol().toUpperCase() == 'HTTP' ? 'badge-http' : (entry.protocol() != null and entry.protocol().toUpperCase() == 'GRPC' ? 'badge-grpc' : 'badge-kafka')}"
+                                      th:text="${entry.protocol() != null ? entry.protocol() : 'HTTP'}">HTTP</span>
+                            </td>
                             <td>
                                 <span class="badge bg-secondary" th:text="${entry.method()}">GET</span>
                             </td>
@@ -87,37 +93,8 @@
             </div>
         </div>
 
-        <!-- Quick Links & Drift Status -->
+        <!-- Quick Links -->
         <div class="col-md-4">
-            <div class="card mb-3">
-                <div class="card-header">
-                    <i class="bi bi-sliders me-2"></i>Drift Status
-                </div>
-                <div class="card-body">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-svp-muted">Base Latency</span>
-                        <span th:text="${driftConfig.baseLatencyMs() + 'ms'}">0ms</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-svp-muted">Jitter</span>
-                        <span th:text="${driftConfig.jitterMs() + 'ms'}">0ms</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-svp-muted">Error Rate</span>
-                        <span th:text="${#numbers.formatDecimal(driftConfig.errorRate() * 100, 1, 1) + '%'}">0%</span>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span class="text-svp-muted">Status</span>
-                        <span th:if="${driftConfig.isActive()}" class="text-svp-yellow">
-                            <i class="bi bi-exclamation-triangle"></i> Active
-                        </span>
-                        <span th:unless="${driftConfig.isActive()}" class="text-svp-green">
-                            <i class="bi bi-check-circle"></i> Inactive
-                        </span>
-                    </div>
-                </div>
-            </div>
-
             <div class="card">
                 <div class="card-header">
                     <i class="bi bi-lightning me-2"></i>Quick Actions

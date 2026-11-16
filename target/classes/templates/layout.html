@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<!--
+    Base layout reference for the Service Virtualization Platform UI.
+
+    Each page template includes shared fragments directly:
+      - <head th:replace="~{fragments/head :: common}"> for CSS/JS
+      - <div th:replace="~{fragments/navbar :: sidebar}"> for the sidebar
+
+    This file serves as documentation for the layout structure.
+-->
+<head th:replace="~{fragments/head :: common}">
+    <title>Service Virtualization Platform</title>
+</head>
+<body>
+
+<div th:replace="~{fragments/navbar :: sidebar}"></div>
+
+<div class="main-content">
+    <!-- Page content goes here in each template -->
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

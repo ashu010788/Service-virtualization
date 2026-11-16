@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
  *
  * Supported placeholders:
  *   {{request.body.fieldName}}      — echo request body field
- *   {{request.pathVar.varName}}     — path variable from Trie
+ *   {{request.pathVar.varName}}     — path variable from Trie (e.g. {id} in URL pattern)
  *   {{request.header.headerName}}   — request header value
  *   {{generate.id:PREFIX}}          — sequential ID (per-session counter)
  *   {{generate.uuid}}               — random UUID

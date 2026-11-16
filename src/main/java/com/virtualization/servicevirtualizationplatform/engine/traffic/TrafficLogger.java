@@ -57,8 +57,20 @@ public class TrafficLogger {
         return recent;
     }
 
+    /**
+     * Blank query params (e.g. {@code ?method=&protocol=}, which a "Method/Topic: All" filter
+     * submits as empty strings rather than omitting) are treated the same as absent — same fix
+     * as StubSearchService. Previously an empty string never equalsIgnoreCase'd a real value,
+     * so every entry was excluded and the UI's filter form silently returned zero rows.
+     */
     public List<TrafficEntry> search(String sessionId, String method, String path,
-                                      String stubId, Integer statusCode, int limit) {
+                                      String stubId, Integer statusCode, String protocol, int limit) {
+        String sessionFilter = blankToNull(sessionId);
+        String methodFilter = blankToNull(method);
+        String pathFilter = blankToNull(path);
+        String stubIdFilter = blankToNull(stubId);
+        String protocolFilter = blankToNull(protocol);
+
         List<TrafficEntry> results = new ArrayList<>();
         int currentIndex = writeIndex.get();
 
@@ -68,12 +80,17 @@ public class TrafficLogger {
             if (entry == null) continue;
 
             boolean matches = true;
-            if (sessionId != null && !entry.sessionId().contains(sessionId)) matches = false;
-            if (method != null && !entry.method().equalsIgnoreCase(method)) matches = false;
-            if (path != null && !entry.path().contains(path)) matches = false;
-            if (stubId != null && (entry.matchedStubId() == null ||
-                    !entry.matchedStubId().contains(stubId))) matches = false;
+            if (sessionFilter != null && !entry.sessionId().contains(sessionFilter)) matches = false;
+            // Partial, case-insensitive match — "method" doubles as a Kafka topic / gRPC method
+            // field in the UI now (free text, not a GET/POST dropdown), so exact equality would
+            // make it impossible to search for part of a topic name.
+            if (methodFilter != null && !entry.method().toLowerCase().contains(methodFilter.toLowerCase())) matches = false;
+            if (pathFilter != null && !entry.path().contains(pathFilter)) matches = false;
+            if (stubIdFilter != null && (entry.matchedStubId() == null ||
+                    !entry.matchedStubId().contains(stubIdFilter))) matches = false;
             if (statusCode != null && entry.statusCode() != statusCode) matches = false;
+            if (protocolFilter != null && (entry.protocol() == null ||
+                    !entry.protocol().equalsIgnoreCase(protocolFilter))) matches = false;
 
             if (matches) {
                 results.add(entry);
@@ -81,6 +98,10 @@ public class TrafficLogger {
             }
         }
         return results;
+    }
+
+    private String blankToNull(String value) {
+        return (value == null || value.isBlank()) ? null : value;
     }
 
     public void clear() {

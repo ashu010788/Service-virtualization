@@ -55,7 +55,13 @@
             <li class="nav-item">
                 <a class="nav-link" th:classappend="${activePage == 'recording' ? 'active' : ''}"
                    th:href="@{/ui/recording}">
-                    <i class="bi bi-record-circle"></i> Recording
+                    <i class="bi bi-record-circle"></i> Record Ingestion
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" th:classappend="${activePage == 'pending-review' ? 'active' : ''}"
+                   th:href="@{/ui/pending-review}">
+                    <i class="bi bi-hourglass-split"></i> Pending Review
                 </a>
             </li>
         </ul>

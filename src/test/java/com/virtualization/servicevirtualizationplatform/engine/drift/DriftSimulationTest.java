@@ -94,15 +94,20 @@ class DriftSimulationTest {
 
     @Test
     void latencyPlusError_bothApplied() {
-        // 50ms latency + 100% error rate → should sleep AND return 500
+        // 50ms latency + 100% error rate → should sleep AND return 500.
+        // Latency is injected BEFORE the error check, so a simulated error still pays the
+        // realistic delay instead of failing back instantly.
         simulator.configure(new DriftConfig(50, 0, 1.0));
 
         VirtualResponse original = new VirtualResponse(
                 "test-stub", 200, Map.of(), Map.of(), false, 0.1, List.of());
 
-        // Error check takes priority (checked first in applyDrift)
+        long start = System.nanoTime();
         VirtualResponse result = simulator.applyDrift(original, "/test");
+        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+
         assertThat(result.statusCode()).isEqualTo(500);
+        assertThat(elapsedMs).isGreaterThanOrEqualTo(45); // small tolerance below 50ms
     }
 
     @Test

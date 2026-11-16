@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.virtualization.servicevirtualizationplatform.ui.DashboardControllerUiTest
+-------------------------------------------------------------------------------
+Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.254 s -- in com.virtualization.servicevirtualizationplatform.ui.DashboardControllerUiTest

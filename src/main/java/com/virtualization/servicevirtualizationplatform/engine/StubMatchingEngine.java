@@ -63,9 +63,6 @@ public class StubMatchingEngine {
         // STEP 2: Evaluate each candidate
         for (StubDefinition stub : match.stubs()) {
 
-            // 2a: Enabled check (cheapest — volatile boolean read)
-            if (!stub.isEnabled()) continue;
-
             matchedRules.clear();
             matchedRules.add("path_pattern");
 
@@ -101,6 +98,30 @@ public class StubMatchingEngine {
                 }
                 matchedRules.add("state_lookup");
                 ctx.setStateResult(stateResult);
+            }
+
+            // 2e: Enabled check — deliberately AFTER all content/state matching, not before.
+            // Confirmed behavior change: a disabled stub whose conditions DO match this request
+            // must NOT silently fall through to the next, less-specific candidate (e.g. a broad
+            // catch-all stub). Specificity ordering means this IS "the" stub for this exact
+            // request shape; if an operator has intentionally disabled it, the request should
+            // get a clear "this is disabled" signal, not a quietly substituted different
+            // response that masks the fact anything changed. A disabled stub whose conditions
+            // DON'T match still falls through as before (the `continue`s above already handle
+            // that — this check never even runs for them).
+            if (!stub.isEnabled()) {
+                double disabledLatencyMs = (System.nanoTime() - startNanos) / 1_000_000.0;
+                VirtualResponse disabledResponse = new VirtualResponse(
+                        stub.stubId(), 404,
+                        Map.of("Content-Type", "application/json"),
+                        Map.of("error", "Matched stub is disabled",
+                                "stubId", stub.stubId(),
+                                "path", request.path(),
+                                "method", request.method()),
+                        false, disabledLatencyMs, List.copyOf(matchedRules)
+                );
+                trafficLogger.log(request, disabledResponse);
+                return disabledResponse;
             }
 
             // STEP 3: MATCH FOUND — resolve response template
@@ -168,7 +189,7 @@ public class StubMatchingEngine {
             );
 
             // STEP 6: Apply drift (latency/jitter/error injection)
-            response = driftSimulator.applyDrift(response, request.path());
+            response = driftSimulator.applyDrift(response, request.path(), request.method(), request.protocol());
 
             // STEP 7: Log to traffic ring buffer
             trafficLogger.log(request, response);

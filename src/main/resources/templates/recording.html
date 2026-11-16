@@ -106,7 +106,13 @@
                         <li class="mb-2"><strong style="color: var(--svp-text);">Paste</strong> raw HTTP request/response JSON</li>
                         <li class="mb-2"><strong style="color: var(--svp-text);">Sanitize</strong> -- PCI/PII fields (card numbers, SSNs, tokens) are automatically masked</li>
                         <li class="mb-2"><strong style="color: var(--svp-text);">Generate</strong> -- A stub definition is created from the sanitized traffic</li>
-                        <li class="mb-2"><strong style="color: var(--svp-text);">Confidence</strong> -- High-confidence stubs (&gt;=90%) auto-publish; lower ones go to review</li>
+                        <li class="mb-2"><strong style="color: var(--svp-text);">Decide</strong> -- based on confidence score and whether the path is payment/fraud/compliance:
+                            <ul class="mt-1 mb-0">
+                                <li><span class="badge bg-success" style="font-size:0.7rem;">AUTO_PUBLISHED</span> confidence &ge; 90% <strong>and</strong> not a payment/fraud/compliance path — stub goes live immediately.</li>
+                                <li><span class="badge bg-warning text-dark" style="font-size:0.7rem;">PENDING_REVIEW</span> confidence is 70–89%, <strong>or</strong> the path contains "payment"/"fraud"/"compliance" (those ALWAYS require a human, even at 100% confidence — a hard guardrail, never auto-published).</li>
+                                <li><span class="badge bg-danger" style="font-size:0.7rem;">REJECTED</span> confidence is below 70% and it isn't a critical path — too much unmasked/unclassified risk to generate a stub at all.</li>
+                            </ul>
+                        </li>
                     </ol>
                 </div>
             </div>
@@ -155,19 +161,8 @@
             html += '</div>';
             html += '</div>';
 
-            if (result.requestSummary) {
-                html += '<h6 style="font-size: 0.8125rem;" class="text-svp-muted">Sanitization Summary</h6>';
-                html += '<div class="row g-2 mb-3">';
-                html += '<div class="col-6"><div class="card p-2">';
-                html += '<div style="font-size: 0.75rem; font-weight: 600;">Request</div>';
-                html += '<pre style="font-size: 0.75rem; max-height: 150px;">' + JSON.stringify(result.requestSummary, null, 2) + '</pre>';
-                html += '</div></div>';
-                html += '<div class="col-6"><div class="card p-2">';
-                html += '<div style="font-size: 0.75rem; font-weight: 600;">Response</div>';
-                html += '<pre style="font-size: 0.75rem; max-height: 150px;">' + JSON.stringify(result.responseSummary, null, 2) + '</pre>';
-                html += '</div></div>';
-                html += '</div>';
-            }
+            html += renderSanitizationSummary('Request', result.requestSummary);
+            html += renderSanitizationSummary('Response', result.responseSummary);
 
             if (result.generatedStub) {
                 html += '<h6 style="font-size: 0.8125rem;" class="text-svp-muted">Generated Stub</h6>';
@@ -183,6 +178,38 @@
             document.getElementById('ingestResult').innerHTML =
                 '<div class="text-svp-red"><i class="bi bi-x-circle me-1"></i>Error: ' + err.message + '</div>';
         });
+    }
+
+    // Renders the PCI/PII sanitization summary for a request or response body: counts of
+    // masked/kept/unknown fields, plus a per-field breakdown with the already-masked value
+    // (the backend's FieldClassificationResult JSON only ever exposes the safe/masked value,
+    // never the raw one, so it's safe to dump straight into the DOM).
+    function renderSanitizationSummary(label, summary) {
+        if (!summary) return '';
+        var html = '<h6 style="font-size: 0.8125rem;" class="text-svp-muted mt-2">Sanitized ' + label + '</h6>';
+        html += '<div class="d-flex gap-2 flex-wrap mb-2" style="font-size: 0.7rem;">';
+        html += '<span class="badge bg-secondary">Total: ' + summary.totalFieldsProcessed + '</span>';
+        html += '<span class="badge bg-info">Classified: ' + summary.classifiedFields + '</span>';
+        html += '<span class="badge bg-danger">PCI masked: ' + summary.pciFieldsMasked + '</span>';
+        html += '<span class="badge bg-warning text-dark">PII masked: ' + summary.piiFieldsMasked + '</span>';
+        html += '<span class="badge bg-success">Safe kept: ' + summary.safeFieldsKept + '</span>';
+        html += '<span class="badge bg-secondary">Unknown: ' + summary.unknownFields + '</span>';
+        if (summary.highRiskUnknowns > 0) {
+            html += '<span class="badge bg-danger">High-risk unknowns: ' + summary.highRiskUnknowns + '</span>';
+        }
+        html += '</div>';
+
+        if (summary.fieldDetails && summary.fieldDetails.length > 0) {
+            html += '<table class="table table-sm table-hover mb-2" style="font-size: 0.7rem;">';
+            html += '<thead><tr><th>Field</th><th>Sanitized Value</th><th>Classification</th></tr></thead><tbody>';
+            summary.fieldDetails.forEach(function(f) {
+                html += '<tr><td><code>' + f.fieldName + '</code></td>' +
+                    '<td><code>' + JSON.stringify(f.originalValue) + '</code></td>' +
+                    '<td>' + f.classification + '</td></tr>';
+            });
+            html += '</tbody></table>';
+        }
+        return html;
     }
 
     function loadSampleJson() {

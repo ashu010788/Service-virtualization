@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/head :: common}">
+    <title>Pending Review | SVP</title>
+</head>
+<body>
+
+<div th:replace="~{fragments/navbar :: sidebar}"></div>
+
+<div class="main-content">
+    <div class="page-header">
+        <h1>Pending Review</h1>
+        <p>Human-review-required stubs awaiting approval or rejection</p>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-hourglass-split me-2"></i>Stubs Awaiting Review
+                (<span th:text="${totalPending}">0</span>)</span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="location.reload()">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0" th:if="${not #lists.isEmpty(pendingRecords)}">
+                <thead>
+                <tr>
+                    <th>Record ID</th>
+                    <th>Timestamp</th>
+                    <th>Path</th>
+                    <th>Method</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="record : ${pendingRecords}">
+                    <td>
+                        <code class="text-accent" th:text="${record.id()}">rec-001</code>
+                    </td>
+                    <td class="text-svp-muted" style="font-size: 0.75rem;"
+                        th:text="${record.timestampFormatted()}">--</td>
+                    <td>
+                        <code th:text="${record.path()}">/api/test</code>
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary" th:text="${record.method()}">GET</span>
+                    </td>
+                    <td>
+                        <span class="badge bg-warning text-dark">
+                            <i class="bi bi-hourglass-split me-1"></i>Pending Review
+                        </span>
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-success btn-sm" title="Approve"
+                                    th:data-record-id="${record.id()}"
+                                    onclick="approveRecord(this.getAttribute('data-record-id'), this)">
+                                <i class="bi bi-check-circle me-1"></i>Approve
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" title="Reject"
+                                    th:data-record-id="${record.id()}"
+                                    onclick="rejectRecord(this.getAttribute('data-record-id'), this)">
+                                <i class="bi bi-x-circle me-1"></i>Reject
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            <div th:if="${#lists.isEmpty(pendingRecords)}" class="text-center py-5 text-svp-muted">
+                <i class="bi bi-inbox" style="font-size: 2.5rem;"></i>
+                <p class="mt-2 mb-0">No stubs pending review</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function approveRecord(recordId, btn) {
+        if (!confirm('Approve stub for record "' + recordId + '"?')) return;
+
+        var row = btn.closest('tr');
+        fetch('/api/v1/recording/' + recordId + '/approve', { method: 'POST' })
+            .then(function(r) {
+                if (!r.ok) throw new Error('Server returned ' + r.status);
+                return r.json();
+            })
+            .then(function(data) {
+                var badge = row.querySelector('.bg-warning');
+                if (badge) {
+                    badge.className = 'badge bg-success';
+                    badge.innerHTML = '<i class="bi bi-check-circle me-1"></i>Approved';
+                }
+                var actionBtns = row.querySelector('.btn-group');
+                if (actionBtns) {
+                    actionBtns.innerHTML = '<span class="text-success"><i class="bi bi-check2"></i> Approved</span>';
+                }
+            })
+            .catch(function(err) {
+                alert('Error approving record: ' + err.message);
+            });
+    }
+
+    function rejectRecord(recordId, btn) {
+        if (!confirm('Reject stub for record "' + recordId + '"?')) return;
+
+        var row = btn.closest('tr');
+        fetch('/api/v1/recording/' + recordId + '/reject', { method: 'POST' })
+            .then(function(r) {
+                if (!r.ok) throw new Error('Server returned ' + r.status);
+                return r.json();
+            })
+            .then(function(data) {
+                var badge = row.querySelector('.bg-warning');
+                if (badge) {
+                    badge.className = 'badge bg-danger';
+                    badge.innerHTML = '<i class="bi bi-x-circle me-1"></i>Rejected';
+                }
+                var actionBtns = row.querySelector('.btn-group');
+                if (actionBtns) {
+                    actionBtns.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Rejected</span>';
+                }
+            })
+            .catch(function(err) {
+                alert('Error rejecting record: ' + err.message);
+            });
+    }
+</script>
+</body>
+</html>

@@ -18,8 +18,14 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Parametrized golden-file test that loads 30 labeled scenarios from
+ * Parametrized golden-file test that loads 30-40 labeled scenarios from
  * stub_match_scenarios.json and validates stub matching + status codes.
+ *
+ * Runs as a single sequential DynamicTest stream on one thread (see
+ * junit-platform.properties), so scenarios within the same category may
+ * intentionally depend on state written by an earlier scenario in the same
+ * category (e.g. a POST create followed by a GET read-back using the same
+ * sessionId) — see stub_match_scenarios.json's category grouping.
  */
 @SpringBootTest
 class GoldenScenarioTest {

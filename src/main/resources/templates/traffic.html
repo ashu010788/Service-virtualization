@@ -28,21 +28,24 @@
     <div class="card mb-3">
         <div class="card-body py-2">
             <form class="row g-2 align-items-end" id="trafficSearchForm">
-                <div class="col-md-3">
+                <div class="col-md-2">
+                    <label class="form-label">Protocol</label>
+                    <select class="form-select form-select-sm" id="searchProtocol">
+                        <option value="">All</option>
+                        <option>HTTP</option>
+                        <option>GRPC</option>
+                        <option>KAFKA</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Method/Topic</label>
+                    <input type="text" class="form-control form-control-sm" id="searchMethod"
+                           placeholder="GET, POST, payment-events..."/>
+                </div>
+                <div class="col-md-2">
                     <label class="form-label">Path</label>
                     <input type="text" class="form-control form-control-sm" id="searchPath"
                            placeholder="Filter by path..."/>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">Method</label>
-                    <select class="form-select form-select-sm" id="searchMethod">
-                        <option value="">All</option>
-                        <option>GET</option>
-                        <option>POST</option>
-                        <option>PUT</option>
-                        <option>DELETE</option>
-                        <option>PATCH</option>
-                    </select>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Status Code</label>
@@ -59,9 +62,9 @@
                     <input type="number" class="form-control form-control-sm" id="searchLimit"
                            value="50" min="1" max="500"/>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-1">
                     <button type="button" class="btn btn-primary btn-sm w-100" onclick="searchTraffic()">
-                        <i class="bi bi-search me-1"></i> Search
+                        <i class="bi bi-search me-1"></i>
                     </button>
                 </div>
             </form>
@@ -89,7 +92,7 @@
                         <th>Timestamp</th>
                         <th>Session</th>
                         <th>Protocol</th>
-                        <th>Method</th>
+                        <th>Method/Topic</th>
                         <th>Path</th>
                         <th>Stub ID</th>
                         <th>Status</th>
@@ -153,7 +156,13 @@
     function startAutoRefresh() {
         if (autoRefreshInterval) clearInterval(autoRefreshInterval);
         autoRefreshInterval = setInterval(function() {
-            if (autoRefreshEnabled) refreshTraffic();
+            // Bug fixed here: this used to always call refreshTraffic(), which hits
+            // /api/v1/traffic/recent and ignores every filter field. The result: you'd click
+            // Search, see a filtered table for ~3 seconds, then watch it silently snap back to
+            // the unfiltered "recent" list on the next auto-refresh tick — looking exactly like
+            // "search doesn't filter". Auto-refresh now re-runs whatever is currently in the
+            // filter fields instead of a separate, filter-blind code path.
+            if (autoRefreshEnabled) searchTraffic();
         }, 3000);
     }
 
@@ -167,28 +176,23 @@
         }
     }
 
-    function refreshTraffic() {
-        var limit = document.getElementById('searchLimit').value || 50;
-        fetch('/api/v1/traffic/recent?limit=' + limit)
-            .then(function(r) { return r.json(); })
-            .then(function(entries) { renderTrafficTable(entries); });
-    }
-
     function searchTraffic() {
         var params = new URLSearchParams();
+        var protocol = document.getElementById('searchProtocol').value;
         var path = document.getElementById('searchPath').value;
         var method = document.getElementById('searchMethod').value;
         var status = document.getElementById('searchStatus').value;
         var stubId = document.getElementById('searchStubId').value;
         var limit = document.getElementById('searchLimit').value || 50;
 
+        if (protocol) params.set('protocol', protocol);
         if (path) params.set('path', path);
         if (method) params.set('method', method);
         if (status) params.set('statusCode', status);
         if (stubId) params.set('stubId', stubId);
         params.set('limit', limit);
 
-        var url = (path || method || status || stubId)
+        var url = (protocol || path || method || status || stubId)
             ? '/api/v1/traffic/search?' + params.toString()
             : '/api/v1/traffic/recent?limit=' + limit;
 
@@ -207,7 +211,7 @@
         }
 
         var html = '<table class="table table-hover mb-0"><thead><tr>' +
-            '<th>Timestamp</th><th>Session</th><th>Protocol</th><th>Method</th>' +
+            '<th>Timestamp</th><th>Session</th><th>Protocol</th><th>Method/Topic</th>' +
             '<th>Path</th><th>Stub ID</th><th>Status</th><th>Latency</th><th>Rules</th>' +
             '</tr></thead><tbody>';
 
@@ -237,7 +241,7 @@
     function clearTraffic() {
         if (!confirm('Clear all traffic logs?')) return;
         fetch('/api/v1/traffic', { method: 'DELETE' })
-            .then(function() { refreshTraffic(); });
+            .then(function() { searchTraffic(); });
     }
 
     startAutoRefresh();

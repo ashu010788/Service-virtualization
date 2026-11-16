@@ -4,12 +4,14 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.virtualization.servicevirtualizationplatform.engine.router.StubRouter;
 import com.virtualization.servicevirtualizationplatform.model.*;
+import com.virtualization.servicevirtualizationplatform.recording.RecordingService;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -20,10 +22,13 @@ public class StubLoader {
 
     private final StubRouter stubRouter;
     private final ObjectMapper objectMapper;
+    private final RecordingService recordingService;
 
-    public StubLoader(StubRouter stubRouter, ObjectMapper objectMapper) {
+    public StubLoader(StubRouter stubRouter, ObjectMapper objectMapper,
+                      RecordingService recordingService) {
         this.stubRouter = stubRouter;
         this.objectMapper = objectMapper;
+        this.recordingService = recordingService;
     }
 
     @PostConstruct
@@ -53,12 +58,57 @@ public class StubLoader {
         } catch (Exception e) {
             log.error("Failed to load seed_stubs.json: {}", e.getMessage());
         }
+
+        // Seed a PENDING_REVIEW record so the Pending Review page has content on first load.
+        // The loan request contains PCI data (SSN, credit card, CVV) + an UNKNOWN field (purpose),
+        // which drops confidence to ~0.86 (between 0.70-0.90) → naturally lands in PENDING_REVIEW.
+        // No CriticalPathClassifier override needed.
+        seedPendingReviewRecord();
+    }
+
+    /**
+     * Ingests a sample loan application with PCI data at startup.
+     * Confidence scores ~0.86 due to unknown fields → PENDING_REVIEW.
+     */
+    private void seedPendingReviewRecord() {
+        try {
+            Map<String, Object> requestBody = new LinkedHashMap<>();
+            requestBody.put("applicant", "John Smith");
+            requestBody.put("ssn", "123-45-6789");
+            requestBody.put("credit_card", "4111111111111111");
+            requestBody.put("cvv", "456");
+            requestBody.put("loan_amount", 25000.00);
+            requestBody.put("term_months", 36);
+            requestBody.put("purpose", "HOME_IMPROVEMENT");
+
+            Map<String, Object> responseBody = new LinkedHashMap<>();
+            responseBody.put("loan_id", "LOAN-5001");
+            responseBody.put("applicant", "John Smith");
+            responseBody.put("loan_amount", 25000.00);
+            responseBody.put("term_months", 36);
+            responseBody.put("purpose", "HOME_IMPROVEMENT");
+            responseBody.put("status", "APPROVED");
+            responseBody.put("monthly_payment", 740.12);
+
+            RawTrafficLog seedLog = new RawTrafficLog(
+                    new RawTrafficLog.RequestData("HTTP", "POST", "/api/v1/loans",
+                            Map.of("Content-Type", "application/json"), requestBody),
+                    new RawTrafficLog.ResponseData(201,
+                            Map.of("Content-Type", "application/json"), responseBody)
+            );
+
+            StubGenerationResult result = recordingService.ingest(seedLog);
+            log.info("Seeded recording record: id={}, status={}, confidence={}",
+                    result.recordId(), result.status(), result.confidence());
+        } catch (Exception e) {
+            log.warn("Failed to seed pending review record: {}", e.getMessage());
+        }
     }
 
     @SuppressWarnings("unchecked")
     private StubDefinition parseStub(Map<String, Object> raw) {
         String stubId = (String) raw.get("stubId");
-        int priority = raw.containsKey("priority") ? ((Number) raw.get("priority")).intValue() : 10;
+        // priority field removed — ordering is automatic (specificity = more conditions first)
 
         Map<String, Object> rmRaw = (Map<String, Object>) raw.get("requestMatcher");
         RequestMatcher rm = new RequestMatcher(
@@ -103,7 +153,7 @@ public class StubLoader {
             )).toList();
         }
 
-        return new StubDefinition(stubId, priority, rm, rt, sa, asyncEvents,
+        return new StubDefinition(stubId, rm, rt, sa, asyncEvents,
                 "seed", (String) raw.getOrDefault("apiVersion", null), null);
     }
 

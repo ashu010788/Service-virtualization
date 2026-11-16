@@ -17,7 +17,6 @@ import java.util.concurrent.atomic.AtomicLong;
 public class StubDefinition {
 
     private final String stubId;
-    private final int priority;
     private final RequestMatcher requestMatcher;
     private final ResponseTemplate responseTemplate;
     private final StateAction stateAction;
@@ -34,12 +33,11 @@ public class StubDefinition {
     private final AtomicLong matchCount;
     private volatile Instant lastMatchedAt;
 
-    public StubDefinition(String stubId, int priority, RequestMatcher requestMatcher,
+    public StubDefinition(String stubId, RequestMatcher requestMatcher,
                           ResponseTemplate responseTemplate, StateAction stateAction,
                           List<AsyncEventConfig> asyncEvents,
                           String source, String apiVersion, Instant expiresAt) {
         this.stubId = stubId;
-        this.priority = priority;
         this.requestMatcher = requestMatcher;
         this.responseTemplate = responseTemplate;
         this.stateAction = stateAction;
@@ -54,17 +52,35 @@ public class StubDefinition {
     }
 
     // Convenience constructor for simple stubs
-    public StubDefinition(String stubId, int priority, RequestMatcher requestMatcher,
+    public StubDefinition(String stubId, RequestMatcher requestMatcher,
                           ResponseTemplate responseTemplate, StateAction stateAction) {
-        this(stubId, priority, requestMatcher, responseTemplate, stateAction,
+        this(stubId, requestMatcher, responseTemplate, stateAction,
                 null, "manual", null, null);
     }
 
     // --- Getters ---
 
     public String stubId() { return stubId; }
-    public int priority() { return priority; }
     public RequestMatcher requestMatcher() { return requestMatcher; }
+
+    /**
+     * Specificity score — replaces manual priority.
+     * More conditions = more specific = checked first during matching.
+     * Stable sort (insertion order) breaks ties.
+     *
+     *   bodyJsonPath condition  = 10 points each
+     *   required header         =  5 points each
+     *
+     * Example: savings stub ($.currency=USD, $.type=SAVINGS) → 20
+     *          regular USD stub ($.currency=USD) → 10
+     *          fallback stub (no conditions) → 0
+     */
+    public int specificity() {
+        int score = 0;
+        if (requestMatcher.bodyJsonPath() != null) score += requestMatcher.bodyJsonPath().size() * 10;
+        if (requestMatcher.headers()      != null) score += requestMatcher.headers().size()      *  5;
+        return score;
+    }
     public ResponseTemplate responseTemplate() { return responseTemplate; }
     public StateAction stateAction() { return stateAction; }
     public List<AsyncEventConfig> asyncEvents() { return asyncEvents; }
@@ -111,4 +127,5 @@ public class StubDefinition {
     public boolean hasHeaderConditions() {
         return requestMatcher.headers() != null && !requestMatcher.headers().isEmpty();
     }
+
 }

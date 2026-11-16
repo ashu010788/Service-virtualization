@@ -63,5 +63,21 @@ public class StubGovernanceScheduler {
             log.info("Governance cleanup: removed {} stubs, {} remaining",
                     removed, stubRouter.totalSize());
         }
+
+        // Approach 2 from the trie-pruning discussion: PathTrie#remove only clears the
+        // StubDefinition entries on a node, never the node itself, so deleted stubs leave
+        // dead TrieNodes behind forever. Rebuilding from the authoritative stubsById map here
+        // (already "not hot path, runs hourly" by design) throws that dead structure away for
+        // free — a freshly built tree only has nodes for segments with at least one live stub.
+        // Runs every cycle, not just when removed > 0 above, because stubs can also be deleted
+        // throughout the day via DELETE /api/v1/stubs/{id} — this is the only place that
+        // periodically cleans up after those too.
+        int nodesBefore = stubRouter.getHttpTrieNodeCount();
+        stubRouter.compactHttpTrie();
+        int nodesAfter = stubRouter.getHttpTrieNodeCount();
+        if (nodesBefore != nodesAfter) {
+            log.info("Trie compaction: {} -> {} nodes ({} pruned)",
+                    nodesBefore, nodesAfter, nodesBefore - nodesAfter);
+        }
     }
 }

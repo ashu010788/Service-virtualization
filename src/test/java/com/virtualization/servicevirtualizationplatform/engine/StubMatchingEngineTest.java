@@ -150,7 +150,7 @@ class StubMatchingEngineTest {
         VirtualResponse response = matchingEngine.matchAndExecute(request);
 
         assertThat(response.statusCode()).isEqualTo(201);
-        // Savings stub has priority 15, regular USD has priority 10
+        // Savings stub has specificity=20 (2 conditions), regular USD has specificity=10 (1 condition)
         assertThat(response.matchedStubId()).isEqualTo("stub_savings_account_create_v1");
         assertThat(response.body().get("type")).isEqualTo("SAVINGS");
     }
@@ -349,7 +349,7 @@ class StubMatchingEngineTest {
     void stub_with500StatusCode_returnsServerError() {
         // Register a stub that returns 500
         StubDefinition errorStub = new StubDefinition(
-                "stub_error_500", 20,
+                "stub_error_500",
                 new RequestMatcher("HTTP", "GET", "/api/v1/health/failing", Map.of(), Map.of()),
                 new ResponseTemplate(500, Map.of("Content-Type", "application/json"),
                         Map.of("error", "Internal Server Error", "code", "SERVICE_UNAVAILABLE")),
@@ -374,7 +374,7 @@ class StubMatchingEngineTest {
     @Test
     void stub_with503_returnsServiceUnavailable() {
         StubDefinition stub503 = new StubDefinition(
-                "stub_error_503", 20,
+                "stub_error_503",
                 new RequestMatcher("HTTP", "POST", "/api/v1/payments/process", Map.of(), Map.of()),
                 new ResponseTemplate(503, Map.of("Content-Type", "application/json"),
                         Map.of("error", "Service Unavailable", "retry_after_seconds", 30)),

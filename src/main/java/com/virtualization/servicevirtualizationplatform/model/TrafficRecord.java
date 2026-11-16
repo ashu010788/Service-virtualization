@@ -1,7 +1,21 @@
 package com.virtualization.servicevirtualizationplatform.model;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+
 import java.time.Instant;
 
+/**
+ * Plain class (not a record) because status/generatedStubId mutate after construction.
+ *
+ * @JsonAutoDetect is REQUIRED here — confirmed bug fixed alongside this comment: without it,
+ * Jackson has no JavaBean getters (id()/timestamp()/etc. don't follow the getXxx() convention)
+ * and no record components to introspect, so GET /api/v1/recording/history threw
+ * InvalidDefinitionException ("no properties discovered") the moment any record existed.
+ * Same fix StubDefinition already uses for the identical reason.
+ */
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY,
+                getterVisibility = JsonAutoDetect.Visibility.NONE,
+                isGetterVisibility = JsonAutoDetect.Visibility.NONE)
 public class TrafficRecord {
 
     public enum Status {

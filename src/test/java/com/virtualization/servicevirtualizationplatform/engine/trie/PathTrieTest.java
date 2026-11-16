@@ -60,15 +60,19 @@ class PathTrieTest {
     }
 
     @Test
-    void priorityOrdering_highestFirst() {
-        trie.insert(createStub("low", "GET", "/api/v1/accounts/{id}", 1));
-        trie.insert(createStub("high", "GET", "/api/v1/accounts/{id}", 10));
+    void specificityOrdering_moreConditionsFirst() {
+        // No body conditions → specificity=0 (fallback)
+        trie.insert(createStub("fallback", "GET", "/api/v1/accounts/{id}", Map.of(), Map.of()));
+        // One body condition → specificity=10 (more specific)
+        trie.insert(createStub("specific", "GET", "/api/v1/accounts/{id}",
+                Map.of(), Map.of("$.status", "ACTIVE")));
 
         MatchCandidates result = trie.search("GET", "/api/v1/accounts/ACC-1");
 
         assertThat(result.stubs()).hasSize(2);
-        assertThat(result.stubs().get(0).stubId()).isEqualTo("high");
-        assertThat(result.stubs().get(1).stubId()).isEqualTo("low");
+        // More specific stub must come first (checked first by engine)
+        assertThat(result.stubs().get(0).stubId()).isEqualTo("specific");   // specificity=10
+        assertThat(result.stubs().get(1).stubId()).isEqualTo("fallback");   // specificity=0
     }
 
     @Test
@@ -94,6 +98,75 @@ class PathTrieTest {
         trie.remove("to-remove");
 
         assertThat(trie.search("GET", "/api/v1/test").stubs()).isEmpty();
+    }
+
+    @Test
+    void removeStub_leavesDeadNodesBehind_documentingWhyRebuildExists() {
+        // Documents the exact limitation that motivated PathTrie#rebuild: remove() only clears
+        // the StubDefinition entries stored on a node, it never prunes the TrieNode itself.
+        trie.insert(createStub("only-stub-here", "GET", "/api/v1/deep/nested/path"));
+        int nodesWithStub = trie.nodeCount(); // root + api + v1 + deep + nested + path = 6
+
+        trie.remove("only-stub-here");
+
+        assertThat(trie.search("GET", "/api/v1/deep/nested/path").stubs())
+                .as("removed stub must no longer match").isEmpty();
+        assertThat(trie.nodeCount())
+                .as("remove() does NOT prune nodes — they're still allocated even though empty")
+                .isEqualTo(nodesWithStub);
+    }
+
+    @Test
+    void rebuild_pronesDeadNodes_andPreservesLiveStubMatching() {
+        trie.insert(createStub("keep-me", "GET", "/api/v1/accounts"));
+        trie.insert(createStub("delete-me", "GET", "/api/v1/deep/nested/path/to/delete"));
+        trie.remove("delete-me"); // leaves dead nodes for deep/nested/path/to/delete behind
+
+        int nodesBeforeRebuild = trie.nodeCount();
+
+        // Rebuild from only the stubs that are actually still live (mirrors how
+        // StubRouter#compactHttpTrie filters stubsById.values() down to HTTP stubs)
+        trie.rebuild(() -> java.util.List.of(trie.search("GET", "/api/v1/accounts").stubs().get(0)));
+
+        assertThat(trie.nodeCount())
+                .as("rebuild must discard the dead deep/nested/path/to/delete branch")
+                .isLessThan(nodesBeforeRebuild);
+        // root + api + v1 + accounts = 4 nodes, nothing more
+        assertThat(trie.nodeCount()).isEqualTo(4);
+
+        // The still-live stub must keep matching correctly after rebuild
+        assertThat(trie.search("GET", "/api/v1/accounts").stubs()).hasSize(1);
+        assertThat(trie.search("GET", "/api/v1/accounts").stubs().get(0).stubId()).isEqualTo("keep-me");
+        // The dead branch must be genuinely gone, not just stub-less
+        assertThat(trie.search("GET", "/api/v1/deep/nested/path/to/delete").stubs()).isEmpty();
+    }
+
+    @Test
+    void rebuild_withMultipleLiveStubs_preservesPathVariablesAndSpecificityOrder() {
+        trie.insert(createStub("fallback", "GET", "/api/v1/orders/{id}", Map.of(), Map.of()));
+        trie.insert(createStub("specific", "GET", "/api/v1/orders/{id}",
+                Map.of(), Map.of("$.status", "PAID")));
+
+        trie.rebuild(() -> java.util.List.of(
+                trie.search("GET", "/api/v1/orders/ORD-1").stubs().get(1), // fallback (specificity=0)
+                trie.search("GET", "/api/v1/orders/ORD-1").stubs().get(0)  // specific (specificity=10)
+        ));
+
+        MatchCandidates result = trie.search("GET", "/api/v1/orders/ORD-1");
+        assertThat(result.pathVariables()).containsEntry("id", "ORD-1");
+        assertThat(result.stubs()).hasSize(2);
+        assertThat(result.stubs().get(0).stubId()).isEqualTo("specific"); // higher specificity first
+        assertThat(result.stubs().get(1).stubId()).isEqualTo("fallback");
+    }
+
+    @Test
+    void rebuild_withEmptyList_producesEmptyTrie() {
+        trie.insert(createStub("will-be-gone", "GET", "/api/v1/anything"));
+
+        trie.rebuild(java.util.List::of);
+
+        assertThat(trie.nodeCount()).isEqualTo(1); // just the root
+        assertThat(trie.search("GET", "/api/v1/anything").stubs()).isEmpty();
     }
 
     @Test
@@ -128,12 +201,14 @@ class PathTrieTest {
     }
 
     private StubDefinition createStub(String id, String method, String path) {
-        return createStub(id, method, path, 10);
+        return createStub(id, method, path, Map.of(), Map.of());
     }
 
-    private StubDefinition createStub(String id, String method, String path, int priority) {
-        return new StubDefinition(id, priority,
-                new RequestMatcher("HTTP", method, path, Map.of(), Map.of()),
+    private StubDefinition createStub(String id, String method, String path,
+                                       Map<String, String> headers,
+                                       Map<String, String> bodyJsonPath) {
+        return new StubDefinition(id,
+                new RequestMatcher("HTTP", method, path, headers, bodyJsonPath),
                 new ResponseTemplate(200, Map.of(), Map.of()),
                 null);
     }

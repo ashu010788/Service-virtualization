@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/head :: common}">
+    <title>Dashboard | SVP</title>
+</head>
+<body>
+
+<div th:replace="~{fragments/navbar :: sidebar}"></div>
+
+<div class="main-content">
+    <div class="page-header">
+        <h1>Dashboard</h1>
+        <p>Service Virtualization Platform overview</p>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="stat-value text-accent" th:text="${totalStubs}">0</div>
+                <div class="stat-label">Total Stubs</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="stat-value text-svp-green" th:text="${activeStubs}">0</div>
+                <div class="stat-label">Active Stubs</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="stat-value text-svp-red" th:text="${disabledStubs}">0</div>
+                <div class="stat-label">Disabled Stubs</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="stat-value text-svp-yellow" th:text="${sessionCount}">0</div>
+                <div class="stat-label">Active Sessions</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- Recent Traffic -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-activity me-2"></i>Recent Traffic</span>
+                    <a th:href="@{/ui/traffic}" class="btn btn-sm btn-outline-primary"
+                       style="font-size: 0.75rem;">View All</a>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0" th:if="${not #lists.isEmpty(recentTraffic)}">
+                        <thead>
+                        <tr>
+                            <th>Protocol</th>
+                            <th>Method</th>
+                            <th>Path</th>
+                            <th>Stub</th>
+                            <th>Status</th>
+                            <th>Latency</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="entry : ${recentTraffic}">
+                            <td>
+                                <span class="badge badge-protocol"
+                                      th:classappend="${entry.protocol() != null and entry.protocol().toUpperCase() == 'HTTP' ? 'badge-http' : (entry.protocol() != null and entry.protocol().toUpperCase() == 'GRPC' ? 'badge-grpc' : 'badge-kafka')}"
+                                      th:text="${entry.protocol() != null ? entry.protocol() : 'HTTP'}">HTTP</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary" th:text="${entry.method()}">GET</span>
+                            </td>
+                            <td th:text="${entry.path()}">/api/test</td>
+                            <td>
+                                <code class="text-accent" th:text="${entry.matchedStubId() != null ? entry.matchedStubId() : 'none'}">stub-1</code>
+                            </td>
+                            <td>
+                                <span th:class="${entry.statusCode() &lt; 400 ? 'text-svp-green' : 'text-svp-red'}"
+                                      th:text="${entry.statusCode()}">200</span>
+                            </td>
+                            <td class="text-svp-muted"
+                                th:text="${#numbers.formatDecimal(entry.executionLatencyMs(), 1, 1) + 'ms'}">0.1ms</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                    <div th:if="${#lists.isEmpty(recentTraffic)}" class="text-center py-4 text-svp-muted">
+                        <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                        <p class="mt-2 mb-0">No traffic recorded yet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Links -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-lightning me-2"></i>Quick Actions
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a th:href="@{/ui/stubs}" class="btn btn-outline-primary btn-sm text-start">
+                            <i class="bi bi-file-earmark-code me-2"></i>Manage Stubs
+                        </a>
+                        <a th:href="@{/ui/sessions}" class="btn btn-outline-primary btn-sm text-start">
+                            <i class="bi bi-person-badge me-2"></i>View Sessions
+                        </a>
+                        <a th:href="@{/ui/recording}" class="btn btn-outline-primary btn-sm text-start">
+                            <i class="bi bi-record-circle me-2"></i>Ingest Traffic
+                        </a>
+                        <a th:href="@{/ui/drift}" class="btn btn-outline-primary btn-sm text-start">
+                            <i class="bi bi-sliders me-2"></i>Configure Drift
+                        </a>
+                        <a th:href="@{/swagger-ui.html}" class="btn btn-outline-secondary btn-sm text-start"
+                           target="_blank">
+                            <i class="bi bi-box-arrow-up-right me-2"></i>API Documentation
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

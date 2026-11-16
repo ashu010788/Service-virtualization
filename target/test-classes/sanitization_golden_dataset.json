@@ -1,0 +1,114 @@
+[
+  {
+    "id": "SAN-01",
+    "label": "Visa card number redaction",
+    "input": {"credit_card": "4111111111111111", "amount": 100.0},
+    "expectedRedactedFields": ["credit_card"],
+    "expectedKeptFields": ["amount"]
+  },
+  {
+    "id": "SAN-02",
+    "label": "MasterCard redaction",
+    "input": {"card_number": "5500000000000004", "currency": "USD"},
+    "expectedRedactedFields": ["card_number"],
+    "expectedKeptFields": ["currency"]
+  },
+  {
+    "id": "SAN-03",
+    "label": "Amex card redaction",
+    "input": {"payment_card": "378282246310005", "status": "ACTIVE"},
+    "expectedRedactedFields": ["payment_card"],
+    "expectedKeptFields": ["status"]
+  },
+  {
+    "id": "SAN-04",
+    "label": "CVV three-digit redaction",
+    "input": {"cvv": "123", "amount": 50.0},
+    "expectedRedactedFields": ["cvv"],
+    "expectedKeptFields": ["amount"]
+  },
+  {
+    "id": "SAN-05",
+    "label": "CVV four-digit redaction",
+    "input": {"security_code": "1234", "name": "Alice"},
+    "expectedRedactedFields": ["security_code"],
+    "expectedKeptFields": ["name"]
+  },
+  {
+    "id": "SAN-06",
+    "label": "SSN redaction",
+    "input": {"ssn": "123-45-6789", "city": "Austin"},
+    "expectedRedactedFields": ["ssn"],
+    "expectedKeptFields": ["city"]
+  },
+  {
+    "id": "SAN-07",
+    "label": "Email PII redaction",
+    "input": {"email": "user@example.com", "tier": "GOLD"},
+    "expectedRedactedFields": ["email"],
+    "expectedKeptFields": ["tier"]
+  },
+  {
+    "id": "SAN-08",
+    "label": "Bearer token redaction",
+    "input": {"token": "Bearer eyJhbGciOiJIUzI1NiJ9.abc", "endpoint": "/api"},
+    "expectedRedactedFields": ["token"],
+    "expectedKeptFields": ["endpoint"]
+  },
+  {
+    "id": "SAN-09",
+    "label": "Nested object recursion",
+    "input": {
+      "payment": {
+        "card": "4111111111111111",
+        "amount": 200.0
+      },
+      "status": "PENDING"
+    },
+    "expectedRedactedFields": ["payment.card"],
+    "expectedKeptFields": ["status"]
+  },
+  {
+    "id": "SAN-10",
+    "label": "All safe fields preserved",
+    "input": {"account_id": "ACC-001", "balance": 500.0, "currency": "USD", "status": "ACTIVE"},
+    "expectedRedactedFields": [],
+    "expectedKeptFields": ["account_id", "balance", "currency", "status"]
+  },
+  {
+    "id": "SAN-11",
+    "label": "Invalid Luhn not treated as card",
+    "input": {"reference": "4111111111111112", "amount": 100.0},
+    "expectedRedactedFields": [],
+    "expectedKeptFields": ["reference", "amount"]
+  },
+  {
+    "id": "SAN-12",
+    "label": "Multiple PCI fields in one request",
+    "input": {"credit_card": "4111111111111111", "cvv": "123", "ssn": "111-22-3333", "amount": 99.0},
+    "expectedRedactedFields": ["credit_card", "cvv", "ssn"],
+    "expectedKeptFields": ["amount"]
+  },
+  {
+    "id": "SAN-13",
+    "label": "Phone number field name triggers redaction",
+    "input": {"phone": "555-123-4567", "name": "Bob"},
+    "expectedRedactedFields": ["phone"],
+    "expectedKeptFields": ["name"]
+  },
+  {
+    "id": "SAN-14",
+    "label": "Password field redaction",
+    "input": {"password": "s3cretP@ss!", "username": "admin"},
+    "expectedRedactedFields": ["password"],
+    "expectedKeptFields": ["username"]
+  },
+  {
+    "id": "SAN-15",
+    "label": "Task spec exact test — PCI payment",
+    "input": {"credit_card": "4111111111111111", "cvv": "123", "amount": 99.99},
+    "expectedRedactedFields": ["credit_card", "cvv"],
+    "expectedKeptFields": ["amount"],
+    "note": "Exact scenario from the task specification"
+  }
+]

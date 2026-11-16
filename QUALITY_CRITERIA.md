@@ -82,7 +82,7 @@ Three-layer classification (field name check → value type check → value patt
 The engine is considered **shippable** when:
 
 1. All 33 labeled golden scenarios in `stub_match_scenarios.json` pass with correct status codes and matched
-   stub IDs. The stubs are mentioned in `seed.stubs.json` . The set is organized into 5 categories (see below) and sized 30-40 by design — enough to cover
+   stub IDs. The set is organized into 5 categories (see below) and sized 30-40 by design — enough to cover
    every routing/matching/state edge case without becoming an unreadable wall of near-duplicates.
 2. Sequential benchmark: p99 < 10 ms over 50,000 iterations after 10,000-iteration warm-up.
 3. Concurrent benchmark: p99 < 10 ms with 16 threads and 160,000 total measurements.
@@ -90,8 +90,11 @@ The engine is considered **shippable** when:
 5. `eval_report.md` contains actual measured p50/p95/p99 values and multi-thread throughput numbers.
 
 
-### Golden scenario categories (`stub_match_scenarios.json`, stubs in `seed.stubs.json`)
+### Golden scenario categories (`stub_match_scenarios.json`)
 
+Scenarios run as a single `@TestFactory` sequence (`GoldenScenarioTest`) on one shared engine instance, in
+array order, on one thread — so scenarios within a category are allowed to depend on state written by an
+earlier scenario in the same category (e.g. a POST create followed by a GET read-back in the same session).
 
 | # | Category | Count | What it proves |
 |---|----------|-------|-----------------|
@@ -99,6 +102,7 @@ The engine is considered **shippable** when:
 | 2 | **Multi-field JSONPath matching** | 6 | Two-field AND conditions outranking single-field stubs, nested-object field extraction (`$.address.country`), and graceful null resolution when the parent object is missing entirely |
 | 3 | **Session state mutation** | 8 | Full CRUD lifecycle on one entity (CREATE → READ → UPDATE → READ confirms in-place overwrite → DELETE → READ confirms removal) plus a cross-collection WRITE/READ pair proving `accounts` and `payments` never share a namespace |
 | 4 | **Multi-tenant session isolation** | 7 | Two independent sessions each create their own account under the *same literal entity key* (`ACC-0001`) with zero cross-visibility; a third, never-provisioned session gets a hard 404 on that key; one tenant's DELETE never touches another tenant's copy |
-| 5 | **Fallback stub match** | 1 | A request with no body conditions (empty `{}`) still resolves to the conditionless fallback stub (`stub_account_create_fallback_v1`) rather than failing to match — i.e. the fallback stub itself is a legitimate, matched route, not a 404. Pure no-match 404 cases (unknown paths, unregistered verbs/gRPC methods/Kafka topics) are covered separately by targeted unit tests (`PathTrieTest`, `PathParamTest`, `TransparentProxyTest`, `ControlPlaneApiTest`) rather than this golden-scenario file |
+| 5 | **Fallback stub match** | 1 | A request with no body conditions (empty `{}`) still resolves to the conditionless fallback stub (`stub_account_create_fallback_v1`) rather than failing to match — i.e. the fallback stub itself is a legitimate, matched route, not a 404. Pure no-match 404 cases (unknown paths, unregistered verbs/gRPC methods/Kafka topics) are covered separately by targeted unit tests (`PathTrieTest`, `PathParamTest`, `ForwardingProxyTest`, `ControlPlaneApiTest`) rather than this golden-scenario file |
 
-
+**Total: 33** (within the 30-40 target band — enough breadth per category to be meaningful, not so many that
+the file becomes noise).

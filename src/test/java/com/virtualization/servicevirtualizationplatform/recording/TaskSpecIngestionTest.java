@@ -178,11 +178,15 @@ class TaskSpecIngestionTest {
         assertThat(((Number) responseTemplate.get("statusCode")).intValue()).isEqualTo(200);
 
         Map<String, Object> stubBody = (Map<String, Object>) responseTemplate.get("body");
-        assertThat(stubBody.get("transaction_id")).isEqualTo("{{generate.id:TXN}}");
+        // transaction_id was never sent by the client → stays the static recorded value
+        // (record/replay semantics — no fresh ID minted on every invocation)
+        assertThat(stubBody.get("transaction_id")).isEqualTo("TXN-881920");
         assertThat(String.valueOf(stubBody.get("card_last_four"))).startsWith("****");
         assertThat(stubBody.get("card_type")).isEqualTo("VISA");
+        // customer_email: in both request (masked) and response (masked) → keep masked value (not echoed)
         assertThat(stubBody.get("customer_email")).isEqualTo("****@masked.com");
-        assertThat(((Number) stubBody.get("amount")).doubleValue()).isEqualTo(150.0);
+        // amount: in both request (150.0, not masked) and response (150.0) → echoed dynamically
+        assertThat(stubBody.get("amount")).isEqualTo("{{request.body.amount}}");
         assertThat(stubBody.get("status")).isEqualTo("SUCCESS");
 
         // No raw data in stub

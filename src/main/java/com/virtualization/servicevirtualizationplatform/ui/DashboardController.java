@@ -8,6 +8,7 @@ import com.virtualization.servicevirtualizationplatform.model.StubDefinition;
 import com.virtualization.servicevirtualizationplatform.model.TrafficEntry;
 import com.virtualization.servicevirtualizationplatform.model.TrafficRecord;
 import com.virtualization.servicevirtualizationplatform.recording.RecordingService;
+import com.virtualization.servicevirtualizationplatform.registry.StubSearchService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,6 +28,7 @@ import java.util.stream.Collectors;
 public class DashboardController {
 
     private final StubRouter stubRouter;
+    private final StubSearchService stubSearchService;
     private final SessionStateStore sessionStateStore;
     private final TrafficLogger trafficLogger;
     private final DriftSimulator driftSimulator;
@@ -36,11 +38,13 @@ public class DashboardController {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
 
     public DashboardController(StubRouter stubRouter,
+                                StubSearchService stubSearchService,
                                 SessionStateStore sessionStateStore,
                                 TrafficLogger trafficLogger,
                                 DriftSimulator driftSimulator,
                                 RecordingService recordingService) {
         this.stubRouter = stubRouter;
+        this.stubSearchService = stubSearchService;
         this.sessionStateStore = sessionStateStore;
         this.trafficLogger = trafficLogger;
         this.driftSimulator = driftSimulator;
@@ -66,9 +70,6 @@ public class DashboardController {
         List<TrafficEntry> recentTraffic = trafficLogger.getRecentEntries(5);
         model.addAttribute("recentTraffic", recentTraffic);
 
-        // Drift config summary
-        model.addAttribute("driftConfig", driftSimulator.getGlobalConfig());
-
         return "dashboard";
     }
 
@@ -79,26 +80,20 @@ public class DashboardController {
                         @RequestParam(required = false) String query,
                         @RequestParam(required = false) String protocol,
                         @RequestParam(required = false) String method,
-                        @RequestParam(required = false) String enabled) {
+                        @RequestParam(required = false) String enabled,
+                        @RequestParam(required = false, defaultValue = "specificity") String sortBy) {
         model.addAttribute("activePage", "stubs");
         model.addAttribute("pageTitle", "Stubs");
 
         Collection<StubDefinition> allStubs = stubRouter.getAllStubs();
+        Boolean enabledFilter = (enabled == null || enabled.isBlank()) ? null : Boolean.valueOf(enabled);
 
-        // Apply filters
-        List<StubDefinition> filtered = allStubs.stream()
-                .filter(s -> query == null || query.isBlank() ||
-                        s.stubId().toLowerCase().contains(query.toLowerCase()) ||
-                        s.requestMatcher().pathPattern().toLowerCase().contains(query.toLowerCase()))
-                .filter(s -> protocol == null || protocol.isBlank() ||
-                        s.requestMatcher().protocol().equalsIgnoreCase(protocol))
-                .filter(s -> method == null || method.isBlank() ||
-                        s.requestMatcher().method().equalsIgnoreCase(method))
-                .filter(s -> enabled == null || enabled.isBlank() ||
-                        s.isEnabled() == Boolean.parseBoolean(enabled))
-                .sorted(Comparator.comparingInt(StubDefinition::priority).reversed()
-                        .thenComparing(StubDefinition::stubId))
-                .collect(Collectors.toList());
+        // Delegates to the same StubSearchService the REST API uses — the UI previously
+        // hand-rolled an independent filter/sort stream here that could silently drift out of
+        // sync with the API's actual search behavior (e.g. the API's 4 sort modes were never
+        // reachable from this page at all). One implementation, two callers now.
+        List<StubDefinition> filtered = stubSearchService.search(
+                query, protocol, method, null, enabledFilter, sortBy, Integer.MAX_VALUE);
 
         model.addAttribute("stubs", filtered);
         model.addAttribute("totalCount", allStubs.size());
@@ -110,6 +105,7 @@ public class DashboardController {
         model.addAttribute("protocol", protocol);
         model.addAttribute("method", method);
         model.addAttribute("enabled", enabled);
+        model.addAttribute("sortBy", sortBy);
 
         return "stubs";
     }
@@ -117,14 +113,16 @@ public class DashboardController {
     // ═══ SESSIONS ═══
 
     @GetMapping("/ui/sessions")
-    public String sessions(Model model) {
+    public String sessions(Model model, @RequestParam(required = false) String query) {
         model.addAttribute("activePage", "sessions");
         model.addAttribute("pageTitle", "Sessions");
 
         Set<String> sessionIds = sessionStateStore.listSessions();
         long now = System.currentTimeMillis();
+        String q = (query == null) ? null : query.trim().toLowerCase();
 
         List<SessionView> sessions = sessionIds.stream()
+                .filter(id -> q == null || q.isBlank() || id.toLowerCase().contains(q))
                 .map(id -> {
                     long lastAccess = sessionStateStore.getLastAccessedAt(id);
                     long created = sessionStateStore.getCreatedAt(id);
@@ -145,6 +143,8 @@ public class DashboardController {
                 .collect(Collectors.toList());
 
         model.addAttribute("sessions", sessions);
+        model.addAttribute("totalSessionCount", sessionIds.size());
+        model.addAttribute("query", query);
         return "sessions";
     }
 
@@ -166,8 +166,9 @@ public class DashboardController {
         model.addAttribute("activePage", "drift");
         model.addAttribute("pageTitle", "Drift");
         model.addAttribute("globalConfig", driftSimulator.getGlobalConfig());
+        model.addAttribute("protocolConfigs", driftSimulator.getProtocolConfigs());
         model.addAttribute("routeConfigs", driftSimulator.getRouteConfigs());
-        model.addAttribute("metrics", driftSimulator.getMetrics().getSnapshot());
+        model.addAttribute("methodConfigs", driftSimulator.getMethodConfigs());
         return "drift";
     }
 
@@ -190,6 +191,29 @@ public class DashboardController {
 
         model.addAttribute("history", historyViews);
         return "recording";
+    }
+
+    // ═══ PENDING REVIEW ═══
+
+    @GetMapping("/ui/pending-review")
+    public String pendingReview(Model model) {
+        model.addAttribute("activePage", "pending-review");
+        model.addAttribute("pageTitle", "Pending Review");
+
+        List<RecordingView> pendingViews = recordingService.getHistory().stream()
+                .filter(r -> r.status().name().equals("PENDING_REVIEW"))
+                .map(r -> new RecordingView(
+                        r.id(),
+                        TIME_FMT.format(r.timestamp()),
+                        r.rawLog().request().path(),
+                        r.rawLog().request().method(),
+                        r.status().name()
+                ))
+                .collect(Collectors.toList());
+
+        model.addAttribute("pendingRecords", pendingViews);
+        model.addAttribute("totalPending", pendingViews.size());
+        return "pending-review";
     }
 
     // ═══ HELPERS ═══
@@ -226,4 +250,5 @@ public class DashboardController {
             String method,
             String status
     ) {}
+
 }

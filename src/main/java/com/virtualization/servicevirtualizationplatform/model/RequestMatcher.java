@@ -10,8 +10,8 @@ public record RequestMatcher(
         Map<String, String> bodyJsonPath
 ) {
     public RequestMatcher {
-        if (protocol == null) protocol = "HTTP";
-        if (headers == null) headers = Map.of();
+        if (protocol == null)     protocol     = "HTTP";
+        if (headers == null)      headers      = Map.of();
         if (bodyJsonPath == null) bodyJsonPath = Map.of();
     }
 }

@@ -2,31 +2,34 @@
 
 ## Baseline Problem
 
-Microservices cloud migrations stall when teams cannot test against downstream dependencies. Real payment gateways, KYC providers, and legacy banking APIs are unavailable in sandbox environments due to cost, compliance, or rate limits. Teams waste **3–5 days per sprint** building brittle hand-written mocks that drift from production behavior, lack PCI compliance, and break silently when APIs evolve. Cross-team test pollution — where one squad's test data corrupts another's CI run — causes phantom failures that erode trust in the pipeline.
+Microservices cloud migrations stall when teams cannot test against downstream dependencies. Real payment gateways and banking APIs are unavailable in sandbox due to per-call cost ($0.05/hit), rate limits, and PCI restrictions. Teams waste **3-5 days per sprint** hand-writing brittle mocks that drift from production and break silently when APIs evolve. Concurrent CI/CD pipelines sharing test data cause phantom failures that erode pipeline trust and block releases.
 
 ## Measurable Outcome (30-Day Pilot, 3 Squads)
 
 | Metric | Baseline | Target |
 |--------|----------|--------|
-| Mock setup time per service | 4–8 hours manual | < 15 min via traffic recording + auto-generation |
-| CI pipeline flakiness from mock drift | ~12% failure rate | < 2% (auto-generated stubs match real traffic) |
-| Sandbox infrastructure cost | $8K–$15K/month per squad | $0 — stubs run in-process, no cloud instances |
-| Cross-team test pollution incidents | 2–3/sprint | 0 (session-isolated state stores) |
-| PCI audit remediation for test data | 40+ hours/quarter | 0 — sanitization runs automatically at ingest |
-| p99 stub matching latency | N/A (real service calls: 50–200ms) | < 10ms (measured: 0.009ms) |
+| Mock setup time per service | 4-8 hours manual | < 15 min via traffic recording + auto-generation |
+| CI flakiness from mock drift | ~12% failure rate | < 2% (stubs match real captured traffic) |
+| Downstream sandbox API cost | $0.05/hit ($8K-$15K/mo/squad) | $0 - stubs serve locally |
+| Cross-team test pollution | 2-3 incidents/sprint | 0 (session-isolated state stores) |
+| PCI audit remediation | 40+ hours/quarter | 0 - auto-sanitization at ingest |
 
-Success = **50% reduction in CI pipeline time** and **zero test pollution incidents** across all 3 squads within 30 days.
+Success = **zero test pollution** and **> 50% reduction in mock setup time** across all 3 squads within 30 days.
 
 ## Risks and Limitations
 
-**Auto-generated stubs can be wrong.** A stub created from a single traffic sample may not cover edge cases (timeouts, partial failures, pagination). Guardrail: confidence scoring rejects low-quality stubs (< 0.70) and queues mid-range (0.70–0.89) for human review. Only high-confidence stubs (≥ 0.90) auto-publish.
+**A. Auto-generated stubs may lack coverage.** (1) A single traffic sample misses edge cases. Guardrail: confidence scoring rejects stubs < 0.70, queues 0.70-0.89 for review, auto-publishes only >= 0.90. (2) Cross-API state linkage in batch ingest can fail — the generator cannot infer which response field should become a state key linking `POST /accounts` to `GET /accounts/{id}`. Heuristics cover common patterns; complex workflows need manual tuning.
 
-**Sanitization has false positives.** Fields like `card_type: "VISA"` contain "card" in the name but aren't PCI data. Guardrail: `KNOWN_SAFE_NAMES` whitelist prevents over-masking of common business fields. Unknown high-entropy strings are flagged for security review, not silently passed.
+**B. Sanitization has false positives and negatives.** `card_type: "VISA"` gets wrongly flagged; card numbers in unexpected fields may be missed. Guardrails: `KNOWN_SAFE_NAMES` whitelist prevents over-masking; regex + Luhn checksum catches card patterns regardless of field name. Recall >= 95%, validated by 24-case adversarial suite.
 
-**Stubs drift from production.** As real APIs evolve, stubs become stale. Guardrail: TTL-based expiry, unused stub detection (no matches in 7 days → flagged), and governance scheduler that auto-cleans expired stubs.
+**C. Stubs drift from production.** As APIs evolve, stubs go stale. Guardrail: governance scheduler removes auto-generated stubs unmatched after 7 days, manual stubs inactive 30+ days, and stubs past explicit TTL.
 
 ## What We Would NOT Automate
 
-**Stub approval for payment-critical paths.** Auto-generated stubs for payment processing, fraud detection, and compliance endpoints must go through human review — a wrong stub here masks real integration bugs that cost money in production. The platform queues these for review rather than auto-publishing, regardless of confidence score.
+**Cross-API state linkage.** Auto-generated stubs are per request/response — they cannot reliably determine which fields link across APIs (e.g. `account_id` returned by `POST /accounts` must become the state key for `GET /accounts/{id}`). Without manual review, a create-then-read flow may silently break: the GET stub looks up state under a wrong key and returns 404. A human must verify and adjust `stateAction` configuration for multi-step workflows.
 
-**Session TTL policy.** Business teams must define how long test sessions live — this is a resource governance decision, not a technical one.
+**Payment-critical stub approval.** Stubs for payment, fraud, and compliance endpoints require human review — a wrong stub masks bugs that cost money in production. The platform queues these regardless of confidence score.
+
+**Low-confidence stub promotion.** Stubs scoring 0.70-0.89 are held in `PENDING_REVIEW`; below 0.70 are rejected. A human must inspect and approve before they enter the live registry.
+
+**Drift and error simulation.** Latency injection, jitter, and error rates must be manually configured per route — the platform cannot infer realistic degradation profiles for a given downstream service.

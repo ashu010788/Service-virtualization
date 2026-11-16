@@ -1,0 +1,308 @@
+
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/head :: common}">
+    <title>Sessions | SVP</title>
+</head>
+<body>
+
+<div th:replace="~{fragments/navbar :: sidebar}"></div>
+
+<div class="main-content">
+    <div class="page-header">
+        <h1>Session Inspector</h1>
+        <p>Manage active sessions and inspect their state</p>
+    </div>
+
+    <!-- Create Session -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <i class="bi bi-plus-circle me-2"></i>Create New Session
+        </div>
+        <div class="card-body">
+            <form id="createSessionForm" class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">Session ID (optional)</label>
+                    <input type="text" class="form-control form-control-sm" id="newSessionId"
+                           placeholder="Auto-generated if empty"/>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">TTL (minutes)</label>
+                    <input type="number" class="form-control form-control-sm" id="newSessionTtl"
+                           value="30" min="1" max="1440"/>
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-primary btn-sm w-100" onclick="createSession()">
+                        <i class="bi bi-plus me-1"></i> Create
+                    </button>
+                </div>
+            </form>
+            <div id="createSessionResult" class="mt-2"></div>
+        </div>
+    </div>
+
+    <!-- Search -->
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <form class="row g-2 align-items-end" method="get" th:action="@{/ui/sessions}">
+                <div class="col-md-4">
+                    <label class="form-label">Search by Session ID</label>
+                    <input type="text" class="form-control form-control-sm" name="query"
+                           th:value="${query}" placeholder="e.g. cicd-runner-9842"/>
+                </div>
+                <div class="col-md-1">
+                    <button type="submit" class="btn btn-primary btn-sm w-100" title="Search">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Sessions List -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-person-badge me-2"></i>Active Sessions
+                (<span th:text="${#lists.size(sessions)}">0</span><span
+                        th:if="${query != null and !query.isBlank()}"
+                        th:text="${' of ' + totalSessionCount}"></span>)</span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="location.reload()">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0" th:if="${not #lists.isEmpty(sessions)}">
+                <thead>
+                <tr>
+                    <th>Session ID</th>
+                    <th>Entities</th>
+                    <th>Created</th>
+                    <th>Idle Time</th>
+                    <th>TTL Remaining</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="sess : ${sessions}">
+                    <td>
+                        <code class="text-accent" th:text="${sess.sessionId()}">sess-abc123</code>
+                    </td>
+                    <td th:text="${sess.entityCount()}">0</td>
+                    <td class="text-svp-muted" th:text="${sess.createdAtFormatted()}">--</td>
+                    <td class="text-svp-muted" th:text="${sess.idleFormatted()}">--</td>
+                    <td>
+                        <span class="text-svp-muted" th:text="${sess.ttlRemainingFormatted()}">--</span>
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary btn-sm" title="View State"
+                                    th:attr="onclick='viewSession(\'' + ${sess.sessionId()} + '\')'">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <button class="btn btn-outline-success btn-sm" title="Add Data / Send Request"
+                                    th:attr="onclick='openAddData(\'' + ${sess.sessionId()} + '\')'">
+                                <i class="bi bi-plus-lg"></i>
+                            </button>
+                            <button class="btn btn-outline-warning btn-sm" title="Clear State"
+                                    th:attr="onclick='clearSession(\'' + ${sess.sessionId()} + '\')'">
+                                <i class="bi bi-eraser"></i>
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" title="Destroy"
+                                    th:attr="onclick='destroySession(\'' + ${sess.sessionId()} + '\')'">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            <div th:if="${#lists.isEmpty(sessions)}" class="text-center py-5 text-svp-muted">
+                <i class="bi bi-person-x" style="font-size: 2.5rem;"></i>
+                <p class="mt-2 mb-0" th:if="${query == null or query.isBlank()}">No active sessions</p>
+                <p class="mt-2 mb-0" th:unless="${query == null or query.isBlank()}"
+                   th:text="|No sessions matching '${query}'|"></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Session State Modal -->
+<div class="modal fade" id="sessionStateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Session State</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="sessionStateContent">
+                    <div class="text-center py-3 text-svp-muted">Loading...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Data Modal -->
+<div class="modal fade" id="addDataModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Data to Session: <code id="addDataSessionId"></code></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Custom Request -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Send custom virtual request</label>
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-2">
+                            <label class="form-label" style="font-size:0.75rem;">Protocol</label>
+                            <select class="form-select form-select-sm" id="addDataProtocol">
+                                <option value="HTTP">HTTP</option>
+                                <option value="GRPC">gRPC</option>
+                                <option value="KAFKA">Kafka</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" style="font-size:0.75rem;">Method/Topic</label>
+                            <input type="text" class="form-control form-control-sm" id="addDataMethod"
+                                   placeholder="POST, or a Kafka topic"/>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label" style="font-size:0.75rem;">Path (HTTP only)</label>
+                            <input type="text" class="form-control form-control-sm" id="addDataPath"
+                                   placeholder="/api/v1/accounts"/>
+                        </div>
+                    </div>
+                    <textarea class="form-control form-control-sm" id="addDataBody" rows="5"
+                              style="font-family:monospace;font-size:0.8rem;"
+                              placeholder='{"account_holder":"Alice","currency":"USD","initial_deposit":500}'></textarea>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="sendCustomRequest()">
+                    <i class="bi bi-send me-1"></i>Send Request
+                </button>
+                <div id="addDataResult" class="mt-3"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function createSession() {
+        var sessionId = document.getElementById('newSessionId').value;
+        var ttl = document.getElementById('newSessionTtl').value;
+        var body = { ttl_minutes: parseInt(ttl) };
+        if (sessionId) body.session_id = sessionId;
+
+        fetch('/api/v1/sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.getElementById('createSessionResult').innerHTML =
+                '<div class="alert alert-success py-1 px-2">Session <code>' + data.session_id + '</code> created</div>';
+            setTimeout(function() { location.reload(); }, 1000);
+        })
+        .catch(function(err) {
+            document.getElementById('createSessionResult').innerHTML =
+                '<div class="alert alert-danger py-1 px-2">Error: ' + err.message + '</div>';
+        });
+    }
+
+    function viewSession(sessionId) {
+        var modal = new bootstrap.Modal(document.getElementById('sessionStateModal'));
+        document.getElementById('sessionStateContent').innerHTML = '<div class="text-center py-3">Loading...</div>';
+        modal.show();
+
+        fetch('/api/v1/sessions/' + sessionId + '/state')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var html = '<h6 class="text-accent mb-3">Session: ' + sessionId + '</h6>';
+                html += '<pre style="max-height:400px;overflow:auto;">' + JSON.stringify(data, null, 2) + '</pre>';
+                document.getElementById('sessionStateContent').innerHTML = html;
+            })
+            .catch(function(err) {
+                document.getElementById('sessionStateContent').innerHTML = '<div class="text-danger">Failed: ' + err.message + '</div>';
+            });
+    }
+
+    function destroySession(sessionId) {
+        if (!confirm('Destroy session ' + sessionId + '?')) return;
+        fetch('/api/v1/sessions/' + sessionId, { method: 'DELETE' })
+            .then(function() { location.reload(); })
+            .catch(function(err) { alert('Error: ' + err.message); });
+    }
+
+    function clearSession(sessionId) {
+        if (!confirm('Clear all state for session ' + sessionId + '?')) return;
+        fetch('/api/v1/sessions/' + sessionId + '/clear', { method: 'POST' })
+            .then(function() { location.reload(); })
+            .catch(function(err) { alert('Error: ' + err.message); });
+    }
+
+    var addDataTargetSession = null;
+
+    function openAddData(sessionId) {
+        addDataTargetSession = sessionId;
+        document.getElementById('addDataSessionId').textContent = sessionId;
+        document.getElementById('addDataResult').innerHTML = '';
+        document.getElementById('addDataBody').value = '';
+        var modal = new bootstrap.Modal(document.getElementById('addDataModal'));
+        modal.show();
+    }
+
+    function sendCustomRequest() {
+        var protocol = document.getElementById('addDataProtocol').value;
+        var method = document.getElementById('addDataMethod').value;
+        var path = document.getElementById('addDataPath').value;
+        var bodyText = document.getElementById('addDataBody').value;
+        var body = null;
+        if (bodyText) {
+            try { body = JSON.parse(bodyText); }
+            catch(e) {
+                document.getElementById('addDataResult').innerHTML =
+                    '<div class="alert alert-danger py-1 px-2">Invalid JSON: ' + e.message + '</div>';
+                return;
+            }
+        }
+        sendVirtualRequest(addDataTargetSession, protocol, method, path, body);
+    }
+
+    function sendVirtualRequest(sessionId, protocol, method, path, body) {
+        var payload = {
+            sessionId: sessionId, protocol: protocol, method: method,
+            path: path, headers: {}, body: body
+        };
+        fetch('/api/v1/virtual', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var statusClass = data.statusCode < 300 ? 'alert-success' : (data.statusCode < 500 ? 'alert-warning' : 'alert-danger');
+            var html = '<div class="alert ' + statusClass + ' py-1 px-2">';
+            html += '<strong>' + data.statusCode + '</strong> — Stub: <code>' + (data.matchedStubId || 'none') + '</code>';
+            html += ' | Latency: ' + (data.executionLatencyMs ? data.executionLatencyMs.toFixed(2) : '?') + 'ms';
+            html += '</div>';
+            html += '<pre style="max-height:200px;overflow:auto;font-size:0.75rem;">' + JSON.stringify(data.body, null, 2) + '</pre>';
+            document.getElementById('addDataResult').innerHTML = html;
+        })
+        .catch(function(err) {
+            document.getElementById('addDataResult').innerHTML =
+                '<div class="alert alert-danger py-1 px-2">Error: ' + err.message + '</div>';
+        });
+    }
+</script>
+</body>
+</html>
