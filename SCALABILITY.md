@@ -2,7 +2,9 @@
 
 ## 20,000 RPS Engine Performance
 
-- **All in-memory, zero-lock reads on the hot path.** Sub-10ms matching at 20K RPS is achieved by holding all data structures entirely in-memory with no disk I/O on the read path. In production, a Redis-backed store with AOF persistence would provide durability and rebuild capability on restart.
+- **All in-memory, zero-lock reads on the hot path.** Sub-10ms matching at 20K RPS is achieved by holding all data structures entirely in-memory with no disk I/O on the read path. In production, a centralised Redis store with replicas and  AOF .
+- **Multiple application server in production using multiple redis replicas for scale. if required sharding can be there in redis, complete trie will be in one node and  shard partition will be based on /triepathAsKeyForHttp/topicName/grpcMethodname as shard partition key.   Also lua script can be used to prevent multiple calls to same shard.
+- **Stubs can be stored in persistence storage also in nosql json based database. But we will use it just as a backup or for audit data which we can persist asynchronusly, direct calls will be in redis.
 - **Copy-on-Write Trie** for HTTP path routing: readers grab a `volatile` root reference (single CPU instruction) and traverse the immutable snapshot. Writers deep-copy, mutate the copy, and atomically swap the root. Readers in-flight see the old snapshot — consistent and non-blocking.
 - **ConcurrentHashMap** for gRPC (method name) and Kafka (topic name) lookups — O(1) with no contention.
 - **No synchronized blocks** in `StubMatchingEngine` — all concurrency is delegated to thread-safe components.
