@@ -44,12 +44,41 @@ public class PciPiiSanitizer {
             Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
 
     private static final Set<String> SENSITIVE_FIELD_NAMES = Set.of(
+            // ── Card numbers ──
             "credit_card", "card_number", "card_no", "cc_number", "pan", "card",
+            "card_num", "cc", "cc_no", "primary_account_number", "card_token", "payment_card",
+
+            // ── CVV / security codes ──
             "cvv", "cvc", "cvv2", "security_code",
+            "card_security_code", "card_cvv", "card_cvc", "cid",
+
+            // ── Banking ──
+            "account_number", "routing_number", "iban", "swift", "bic",
+            "sort_code", "bank_account", "bank_account_number",
+
+            // ── SSN / Tax / National ID ──
             "ssn", "social_security", "social_security_number", "tax_id",
+            "tin", "ein", "itin", "taxpayer_id", "vat_number",
+            "national_id", "sin",
+
+            // ── PII documents ──
+            "passport", "passport_number", "drivers_license", "dl_number",
+            "date_of_birth", "dob",
+
+            // ── Email ──
             "email", "email_address", "customer_email",
+
+            // ── Auth / secrets ──
             "password", "passwd", "secret", "token", "auth_token",
-            "authorization", "phone", "phone_number", "mobile"
+            "authorization", "api_key", "access_token", "refresh_token",
+            "private_key", "client_secret", "session_token", "x_api_key",
+
+            // ── PIN ──
+            "pin", "pin_code", "card_pin", "atm_pin", "security_answer",
+
+            // ── Phone / contact ──
+            "phone", "phone_number", "mobile",
+            "cell", "cell_phone", "home_phone", "work_phone", "fax", "contact_phone"
     );
 
     private static final Set<String> KNOWN_SAFE_NAMES = Set.of(
@@ -436,12 +465,38 @@ public class PciPiiSanitizer {
     }
 
     private FieldClassification classifyByName(String lowerName) {
-        if (lowerName.contains("card") || lowerName.equals("pan")) return FieldClassification.PCI_CARD;
-        if (lowerName.contains("cvv") || lowerName.contains("cvc") || lowerName.contains("security_code"))
-            return FieldClassification.PCI_CVV;
-        if (lowerName.contains("ssn") || lowerName.contains("social")) return FieldClassification.PII_SSN;
+        // Card numbers
+        if (lowerName.contains("card") || lowerName.equals("pan") || lowerName.equals("cc")
+                || lowerName.equals("cc_no") || lowerName.equals("primary_account_number")
+                || lowerName.equals("payment_card")) return FieldClassification.PCI_CARD;
+        // CVV / security codes
+        if (lowerName.contains("cvv") || lowerName.contains("cvc") || lowerName.contains("security_code")
+                || lowerName.equals("cid")) return FieldClassification.PCI_CVV;
+        // PIN
+        if (lowerName.equals("pin") || lowerName.equals("pin_code")
+                || lowerName.equals("atm_pin")) return FieldClassification.PCI_CVV;
+        // SSN / Tax / National ID
+        if (lowerName.contains("ssn") || lowerName.contains("social")
+                || lowerName.equals("tax_id") || lowerName.equals("tin") || lowerName.equals("ein")
+                || lowerName.equals("itin") || lowerName.equals("taxpayer_id")
+                || lowerName.equals("national_id") || lowerName.equals("sin")
+                || lowerName.equals("vat_number")) return FieldClassification.PII_SSN;
+        // PII documents
+        if (lowerName.contains("passport") || lowerName.contains("drivers_license")
+                || lowerName.equals("dl_number") || lowerName.equals("dob")
+                || lowerName.equals("date_of_birth")) return FieldClassification.PII_SSN;
+        // Email
         if (lowerName.contains("email")) return FieldClassification.PII_EMAIL;
-        if (lowerName.contains("phone") || lowerName.contains("mobile")) return FieldClassification.PII_PHONE;
+        // Phone / contact
+        if (lowerName.contains("phone") || lowerName.contains("mobile")
+                || lowerName.equals("cell") || lowerName.equals("cell_phone")
+                || lowerName.equals("fax") || lowerName.equals("contact_phone")) return FieldClassification.PII_PHONE;
+        // Banking (account_number, routing_number, iban, swift, etc.)
+        if (lowerName.equals("account_number") || lowerName.equals("routing_number")
+                || lowerName.equals("iban") || lowerName.equals("swift") || lowerName.equals("bic")
+                || lowerName.equals("sort_code") || lowerName.equals("bank_account")
+                || lowerName.equals("bank_account_number")) return FieldClassification.PCI_CARD;
+        // Everything else in SENSITIVE_FIELD_NAMES (password, secret, tokens, api_key, etc.)
         return FieldClassification.PCI_AUTH_TOKEN;
     }
 
