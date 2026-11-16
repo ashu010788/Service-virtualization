@@ -163,27 +163,11 @@ root
                  └─ "{id}"       → stubs: [stub_account_get_v1(specificity=0), stub_account_not_found(specificity=0)]
                       └─ ...
 ```
-Specificity purpose:- the engine always tries the stub with the most conditions first, and only falls through to a broader/fallback stub if the specific one's
-extra conditions genuinely don't match this particular request. That's the whole point of specificity scoring — "most specific wins," without anyone having to
-hand-maintain a manual priority number.
-`stub_account_get_v1` and `stub_account_not_found` are a genuine tie (both have empty `headers`
-and `bodyJsonPath` — neither contributes to `specificity()`). The stable sort preserves
-seed-file order for ties, and `get_v1` is declared before `not_found` in `seed_stubs.json`, so it
-stays first in the candidate list — the engine tries its `stateAction READ` first and only falls
-through to the 404 stub if that lookup comes back empty. This is the real, live version of the
-specificity-tiebreak behavior we discussed earlier in this chat — not a hypothetical.
-
-Each node's stub list is kept pre-sorted by `specificity()` descending **at insert time**
-(`Comparator.comparingInt(StubDefinition::specificity).reversed()`), so `search()` never sorts on
-the hot path — it's a read-only walk over an already-ordered list, first enabled match wins.
+**Fallback determination:** Specificity = `(bodyJsonPath conditions × 10) + (header conditions × 5)`. Candidates are pre-sorted descending at insert time — the engine walks top-to-bottom, and any check that fails (headers, body JSONPath, or state READ returning null) skips to the next candidate. For equal-specificity ties, seed-file registration order breaks the tie — e.g. the state-READ stub is tried first, and only if the key isn't found does the 404 fallback match.
 
 Path variables (e.g. `{id}`) are extracted at match time and placed in `pathVariables` map for use in `{{request.pathVar.id}}` templates.
 
 ### 2. gRPC Index — HashMap of method → List<Stub>
-
-Specificity purpose:- the engine always tries the stub with the most conditions first, and only falls through to a broader/fallback stub if the specific one's
-extra conditions genuinely don't match this particular request. That's the whole point of specificity scoring — "most specific wins," without anyone having to
-hand-maintain a manual priority number.
 
 ```
 grpcIndex: ConcurrentHashMap<String, List<StubDefinition>>
