@@ -95,10 +95,6 @@
                     </td>
                     <td>
                         <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-primary btn-sm" title="View State"
-                                    th:attr="onclick='viewSession(\'' + ${sess.sessionId()} + '\')'">
-                                <i class="bi bi-eye"></i>
-                            </button>
                             <button class="btn btn-outline-success btn-sm" title="Add Data / Send Request"
                                     th:attr="onclick='openAddData(\'' + ${sess.sessionId()} + '\')'">
                                 <i class="bi bi-plus-lg"></i>
@@ -280,8 +276,8 @@
 
     function sendVirtualRequest(sessionId, protocol, method, path, body) {
         var payload = {
-            sessionId: sessionId, protocol: protocol, method: method,
-            path: path, headers: {}, body: body
+            session_id: sessionId, protocol: protocol, method: method,
+            path: path, headers: {}, body: body || {}
         };
         fetch('/api/v1/virtual', {
             method: 'POST',
@@ -290,10 +286,13 @@
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            var statusClass = data.statusCode < 300 ? 'alert-success' : (data.statusCode < 500 ? 'alert-warning' : 'alert-danger');
+            var statusCode = data.status_code;
+            var stubId = data.matched_stub_id;
+            var latency = data.execution_latency_ms;
+            var statusClass = statusCode < 300 ? 'alert-success' : (statusCode < 500 ? 'alert-warning' : 'alert-danger');
             var html = '<div class="alert ' + statusClass + ' py-1 px-2">';
-            html += '<strong>' + data.statusCode + '</strong> — Stub: <code>' + (data.matchedStubId || 'none') + '</code>';
-            html += ' | Latency: ' + (data.executionLatencyMs ? data.executionLatencyMs.toFixed(2) : '?') + 'ms';
+            html += '<strong>' + statusCode + '</strong> — Stub: <code>' + (stubId || 'none') + '</code>';
+            html += ' | Latency: ' + (latency ? latency.toFixed(2) : '?') + 'ms';
             html += '</div>';
             html += '<pre style="max-height:200px;overflow:auto;font-size:0.75rem;">' + JSON.stringify(data.body, null, 2) + '</pre>';
             document.getElementById('addDataResult').innerHTML = html;
