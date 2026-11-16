@@ -163,7 +163,7 @@ root
                  └─ "{id}"       → stubs: [stub_account_get_v1(specificity=0), stub_account_not_found(specificity=0)]
                       └─ ...
 ```
-Specifity purpose:- the engine always tries the stub with the most conditions first, and only falls through to a broader/fallback stub if the specific one's
+Specificity purpose:- the engine always tries the stub with the most conditions first, and only falls through to a broader/fallback stub if the specific one's
 extra conditions genuinely don't match this particular request. That's the whole point of specificity scoring — "most specific wins," without anyone having to
 hand-maintain a manual priority number.
 `stub_account_get_v1` and `stub_account_not_found` are a genuine tie (both have empty `headers`
@@ -181,7 +181,7 @@ Path variables (e.g. `{id}`) are extracted at match time and placed in `pathVari
 
 ### 2. gRPC Index — HashMap of method → List<Stub>
 
-Specifity purpose:- the engine always tries the stub with the most conditions first, and only falls through to a broader/fallback stub if the specific one's
+Specificity purpose:- the engine always tries the stub with the most conditions first, and only falls through to a broader/fallback stub if the specific one's
 extra conditions genuinely don't match this particular request. That's the whole point of specificity scoring — "most specific wins," without anyone having to
 hand-maintain a manual priority number.
 
@@ -251,10 +251,6 @@ wherever `writeIndex` currently points, with the index wrapped via `Math.floorMo
 - `currentIndex - 1` is the slot that was written *last* (writeIndex always points one past the
   most recent write), so `i = 0` yields the newest entry.
 
-
-Supports `GET /api/v1/traffic/recent?limit=N` and `GET /api/v1/traffic/search` (filters by
-session/method/path/stubId/statusCode/protocol while walking the same backward order, so filtered
-results stay newest-first too).
 
 ---
 
@@ -607,15 +603,12 @@ Both approve/reject are no-ops (logged, not thrown) if the record isn't currentl
 | Performance & Benchmarks | 6 | PerformanceBenchmarkTest: p99 latency, 800K+ RPS throughput, 16-session isolation, sanitization precision/recall, resilience |
 | Session Isolation | 5 | SessionIsolationTest: 3-level ConcurrentHashMap isolation, concurrent writes, cross-session 404, person SSN+salary isolation |
 | Stub Router Concurrency | 5 | StubRouterConcurrencyTest: concurrent register/deregister, CoW Trie consistency under contention |
-| Recording Critical Path | 4 | RecordingServiceCriticalPathTest: payment/fraud/compliance paths forced to PENDING_REVIEW regardless of confidence |
 | Stub Governance (TTL) | 2 | StubGovernanceSchedulerTest: expired stub cleanup sweep, TTL enforcement |
 | **Total** | **313** | **25 test classes, 0 failures** |
 
 ### What's NOT Tested
 - Real gRPC binary protocol handling (simulated via JSON over `/api/v1/virtual`)
-- Browser-level UI testing (manual verification only)
-- Disk persistence (in-memory only)
-- Multi-node distributed scenarios
+
 
 ---
 
